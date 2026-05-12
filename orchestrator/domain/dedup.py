@@ -62,9 +62,7 @@ Regras:
 """
 
 
-async def semantic_dedup(
-    findings: list[Finding], *, model: str | None = None
-) -> list[Finding]:
+async def semantic_dedup(findings: list[Finding], *, model: str | None = None) -> list[Finding]:
     """Usa LLM para agrupar findings semanticamente equivalentes.
 
     Mantém o "primary" e descarta os duplicados (com merge de evidências).
@@ -93,7 +91,10 @@ async def semantic_dedup(
         response = await complete_json(
             [
                 {"role": "system", "content": _SEMANTIC_PROMPT},
-                {"role": "user", "content": "FINDINGS:\n" + json.dumps(summary, ensure_ascii=False)},
+                {
+                    "role": "user",
+                    "content": "FINDINGS:\n" + json.dumps(summary, ensure_ascii=False),
+                },
             ],
             model=model,
             cache_system=True,

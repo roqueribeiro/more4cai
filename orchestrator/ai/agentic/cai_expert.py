@@ -59,9 +59,7 @@ async def investigate_finding(
 
     if _cai_framework_available():
         try:
-            return await _investigate_with_cai(
-                finding, extra_instructions, dry_run, max_steps
-            )
+            return await _investigate_with_cai(finding, extra_instructions, dry_run, max_steps)
         except Exception as e:  # noqa: BLE001
             log.warning("cai.framework_failed_fallback", error=str(e))
 
@@ -71,6 +69,7 @@ async def investigate_finding(
 def _cai_framework_available() -> bool:
     try:
         import cai  # type: ignore[import-not-found]  # noqa: F401
+
         return True
     except ImportError:
         return False
@@ -108,7 +107,7 @@ FINDING:
 - payload: {finding.payload}
 
 dry_run={dry_run}
-{f'INSTRUÇÕES ADICIONAIS DO OPERADOR: {extra}' if extra else ''}
+{f"INSTRUÇÕES ADICIONAIS DO OPERADOR: {extra}" if extra else ""}
 
 Investigue. Retorne JSON com:
 - plan: lista de passos de investigação (cada um com command_suggestion, rationale)
@@ -161,7 +160,7 @@ async def kali_run_readonly(cmd: list[str], timeout: float = 60.0) -> dict[str, 
             "stdout": stdout.decode(errors="replace")[:8000],
             "stderr": stderr.decode(errors="replace")[:2000],
         }
-    except asyncio.TimeoutError:
+    except TimeoutError:
         return {"error": "timeout"}
     except Exception as e:  # noqa: BLE001
         return {"error": str(e)}

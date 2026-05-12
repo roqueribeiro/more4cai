@@ -21,12 +21,26 @@ from fastapi.staticfiles import StaticFiles
 from orchestrator.ai.observability import log_processor
 from orchestrator.api.routers import (
     exposure as exposure_router,
+)
+from orchestrator.api.routers import (
     findings as findings_router,
+)
+from orchestrator.api.routers import (
     health as health_router,
+)
+from orchestrator.api.routers import (
     investigate as investigate_router,
+)
+from orchestrator.api.routers import (
     reports as reports_router,
+)
+from orchestrator.api.routers import (
     scans as scans_router,
+)
+from orchestrator.api.routers import (
     targets as targets_router,
+)
+from orchestrator.api.routers import (
     ui as ui_router,
 )
 from orchestrator.config import settings

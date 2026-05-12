@@ -50,9 +50,7 @@ async def list_findings(
 
 
 @router.get("/{finding_id}", response_model=FindingOut)
-async def get_finding(
-    finding_id: UUID, session: SessionDep, _token: TokenDep
-) -> FindingOut:
+async def get_finding(finding_id: UUID, session: SessionDep, _token: TokenDep) -> FindingOut:
     row = await session.get(FindingRow, finding_id)
     if row is None:
         raise HTTPException(404, "finding não encontrado")

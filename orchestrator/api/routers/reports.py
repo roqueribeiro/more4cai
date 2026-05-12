@@ -15,9 +15,7 @@ router = APIRouter(prefix="/reports", tags=["reports"])
 
 
 @router.get("/{scan_id}")
-async def download_report(
-    scan_id: UUID, session: SessionDep, _token: TokenDep
-) -> FileResponse:
+async def download_report(scan_id: UUID, session: SessionDep, _token: TokenDep) -> FileResponse:
     scan = await session.get(ScanRow, scan_id)
     if scan is None or not scan.report_path:
         raise HTTPException(404, "relatório não encontrado")
@@ -28,9 +26,7 @@ async def download_report(
 
 
 @router.get("/{scan_id}/ai-bundle")
-async def download_ai_bundle(
-    scan_id: UUID, session: SessionDep, _token: TokenDep
-) -> JSONResponse:
+async def download_ai_bundle(scan_id: UUID, session: SessionDep, _token: TokenDep) -> JSONResponse:
     """AI Fix Bundle — JSON estruturado pra outra IA consumir e patchar código.
 
     Schema versionado em `docs/ai-fix-bundle-spec.md`. Patcher externo
@@ -51,9 +47,7 @@ async def download_ai_bundle(
 
 
 @router.post("/{scan_id}/export/defectdojo", status_code=202)
-async def export_defectdojo(
-    scan_id: UUID, session: SessionDep, _token: TokenDep
-) -> JSONResponse:
+async def export_defectdojo(scan_id: UUID, session: SessionDep, _token: TokenDep) -> JSONResponse:
     """Exporta findings desse scan pro DefectDojo via API."""
     from orchestrator.reporting.exporters.defectdojo import export_scan
 

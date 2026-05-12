@@ -93,7 +93,7 @@ async def sse_stream(scan_id: str | None = None, max_idle_seconds: int = 30) -> 
         ev = _signal()
         try:
             await asyncio.wait_for(ev.wait(), timeout=15.0)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             # heartbeat
             yield ": keepalive\n\n"
             continue

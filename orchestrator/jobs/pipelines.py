@@ -215,9 +215,7 @@ async def _ensure_scan_row(scan_id: UUID, target: Target) -> None:
         log.warning("scan.upfront_persist_failed", scan_id=str(scan_id), error=str(e))
 
 
-async def _update_phase(
-    scan_id: UUID, phase: str, progress: int | None = None
-) -> None:
+async def _update_phase(scan_id: UUID, phase: str, progress: int | None = None) -> None:
     """Best-effort: atualiza ScanRow.current_phase. Falha silenciosamente."""
     try:
         from orchestrator.persistence.db import session
@@ -237,15 +235,13 @@ async def _update_phase(
 async def _persist_findings(scan_id: Any, target: Target, findings: list[Finding]) -> None:
     """Best-effort: grava Findings em DB. Silencia falha (DB pode não estar ar)."""
     from orchestrator.persistence.db import session
-    from orchestrator.persistence.models import FindingRow, ScanRow, TargetRow, ScanState
+    from orchestrator.persistence.models import FindingRow, ScanRow, ScanState, TargetRow
 
     async with session() as s:
         # acha-or-cria target
         from sqlmodel import select
 
-        existing = (
-            await s.exec(select(TargetRow).where(TargetRow.value == target.value))
-        ).first()
+        existing = (await s.exec(select(TargetRow).where(TargetRow.value == target.value))).first()
         if existing is None:
             target_row = TargetRow(
                 asset_type=target.asset_type.value,
@@ -279,7 +275,9 @@ async def _persist_findings(scan_id: Any, target: Target, findings: list[Finding
                     source_rule_id=f.source_rule_id,
                     vuln_id=f.vuln_id,
                     title=f.title,
-                    severity=(f.ai_triage.adjusted_severity.value if f.ai_triage else f.severity.value),
+                    severity=(
+                        f.ai_triage.adjusted_severity.value if f.ai_triage else f.severity.value
+                    ),
                     confidence=f.confidence.value,
                     payload=f.model_dump(mode="json"),
                 )

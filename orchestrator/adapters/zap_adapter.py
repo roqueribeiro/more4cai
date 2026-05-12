@@ -124,9 +124,7 @@ class ZAPAdapter:
             )
             if attempt == 1:
                 # re-acessa URL pra resetar estado interno do ZAP e tenta de novo
-                await self._get(
-                    "/JSON/core/action/accessUrl/", url=url, followRedirects="true"
-                )
+                await self._get("/JSON/core/action/accessUrl/", url=url, followRedirects="true")
         raise RuntimeError(
             f"ZAP returned invalid spider scan_id after retry (got {spider_id!r}); "
             "verifique se o daemon não foi reiniciado / sessão corrompida"
@@ -139,9 +137,7 @@ class ZAPAdapter:
 
         try:
             if state["phase"] == "spider":
-                s = await self._get(
-                    "/JSON/spider/view/status/", scanId=str(state["spider_id"])
-                )
+                s = await self._get("/JSON/spider/view/status/", scanId=str(state["spider_id"]))
                 progress = int(s.get("status", "0"))
                 if progress >= 100:
                     if state["active"]:
@@ -162,9 +158,7 @@ class ZAPAdapter:
                 return ScanStatus.RUNNING
 
             if state["phase"] == "ascan":
-                s = await self._get(
-                    "/JSON/ascan/view/status/", scanId=str(state["ascan_id"])
-                )
+                s = await self._get("/JSON/ascan/view/status/", scanId=str(state["ascan_id"]))
                 progress = int(s.get("status", "0"))
                 if progress >= 100:
                     state["phase"] = "passive_wait"
@@ -209,8 +203,10 @@ class ZAPAdapter:
             confidence = _ZAP_CONFIDENCE.get(confidence_str, Confidence.FIRM)
 
             url = a.get("url", "")
-            target = Target(asset_type=AssetType.URL, value=url) if url else Target(
-                asset_type=AssetType.URL, value="unknown"
+            target = (
+                Target(asset_type=AssetType.URL, value=url)
+                if url
+                else Target(asset_type=AssetType.URL, value="unknown")
             )
 
             cwe_id = a.get("cweid")
@@ -256,7 +252,9 @@ class ZAPAdapter:
 
         if not text:
             return []
-        urls = [u.strip() for u in text.split("\n") if u.strip().startswith(("http://", "https://"))]
+        urls = [
+            u.strip() for u in text.split("\n") if u.strip().startswith(("http://", "https://"))
+        ]
         adapter = TypeAdapter(HttpUrl)
         out: list[Any] = []
         for u in urls:

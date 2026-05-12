@@ -36,12 +36,12 @@ async def dispose_db() -> None:
 
 
 @asynccontextmanager
-async def session() -> AsyncGenerator[AsyncSession, None]:
+async def session() -> AsyncGenerator[AsyncSession]:
     async with _session_factory() as s:
         yield s
 
 
-async def get_session() -> AsyncGenerator[AsyncSession, None]:
+async def get_session() -> AsyncGenerator[AsyncSession]:
     """FastAPI dependency."""
     async with _session_factory() as s:
         yield s

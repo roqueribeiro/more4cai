@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from uuid import UUID
-
 from arq import create_pool
 from fastapi import APIRouter, status
 from pydantic import BaseModel, Field

@@ -41,8 +41,10 @@ class GitleaksAdapter:
     async def health(self) -> bool:
         try:
             p = await asyncio.create_subprocess_exec(
-                self.gitleaks_bin, "version",
-                stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
+                self.gitleaks_bin,
+                "version",
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
             )
             await p.communicate()
             return p.returncode == 0
@@ -61,8 +63,15 @@ class GitleaksAdapter:
         async def _run() -> tuple[int, Path]:
             # 1. clone --depth N
             clone = await asyncio.create_subprocess_exec(
-                self.git_bin, "clone", "--quiet", "--depth", depth, target.value, str(clone_dir),
-                stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.PIPE,
+                self.git_bin,
+                "clone",
+                "--quiet",
+                "--depth",
+                depth,
+                target.value,
+                str(clone_dir),
+                stdout=asyncio.subprocess.DEVNULL,
+                stderr=asyncio.subprocess.PIPE,
             )
             _, stderr = await clone.communicate()
             if clone.returncode != 0:
@@ -71,12 +80,17 @@ class GitleaksAdapter:
 
             # 2. gitleaks detect
             scan_args = [
-                self.gitleaks_bin, "detect",
-                "--source", str(clone_dir),
-                "--report-format", "json",
-                "--report-path", str(report_path),
+                self.gitleaks_bin,
+                "detect",
+                "--source",
+                str(clone_dir),
+                "--report-format",
+                "json",
+                "--report-path",
+                str(report_path),
                 "--no-banner",
-                "--exit-code", "0",  # achar leak não é "erro"
+                "--exit-code",
+                "0",  # achar leak não é "erro"
             ]
             scan = await asyncio.create_subprocess_exec(
                 *scan_args,

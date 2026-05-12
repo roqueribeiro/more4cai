@@ -11,8 +11,8 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from typing import Any
-from uuid import UUID, uuid5
 from urllib.parse import urlparse
+from uuid import UUID, uuid5
 
 import structlog
 from sqlmodel import select
@@ -78,9 +78,7 @@ async def build_bundle(scan_id: UUID) -> dict[str, Any]:
             raise ValueError(f"scan {scan_id} não encontrado")
 
         target = await s.get(TargetRow, scan.target_id)
-        rows = (
-            await s.exec(select(FindingRow).where(FindingRow.scan_id == scan_id))
-        ).all()
+        rows = (await s.exec(select(FindingRow).where(FindingRow.scan_id == scan_id))).all()
 
     log.info("bundle.build_start", scan_id=str(scan_id), findings=len(rows))
 
@@ -101,9 +99,7 @@ async def build_bundle(scan_id: UUID) -> dict[str, Any]:
             "started_at": scan.started_at.isoformat() if scan.started_at else None,
             "finished_at": scan.finished_at.isoformat() if scan.finished_at else None,
             "scanners_executed": list(scan.requested_scanners or []),
-            "scanners_failed": [
-                e.split(":")[0] for e in (scan.errors or []) if ":" in e
-            ],
+            "scanners_failed": [e.split(":")[0] for e in (scan.errors or []) if ":" in e],
         },
         "target": _target_section(target),
         "summary": _summary(vulnerabilities),
@@ -229,7 +225,7 @@ def _finding_to_vuln(row: FindingRow) -> dict[str, Any]:
     # uuid estável: namespace + deduped_key
     vuln_id = str(uuid5(_BUNDLE_UUID_NS, row.deduped_key))
 
-    target_obj = (payload.get("target") or {})
+    target_obj = payload.get("target") or {}
     target_value = target_obj.get("value") or row.title
 
     # evidence — passa pelo scrubber antes de servir
@@ -250,7 +246,10 @@ def _finding_to_vuln(row: FindingRow) -> dict[str, Any]:
             {
                 "instance_id": str(uuid5(_BUNDLE_UUID_NS, row.deduped_key + "_default")),
                 "location": _build_location(location_kind, target_value, payload),
-                "evidence": {"scrubbed": True, "description": scrub(payload.get("description", ""))},
+                "evidence": {
+                    "scrubbed": True,
+                    "description": scrub(payload.get("description", "")),
+                },
             }
         )
 
@@ -357,7 +356,9 @@ def _build_remediation(
         "rationale": triage.get("rationale", ""),
         "patch_strategy": {
             "approach": approach,
-            "confidence": "high" if approach in ("dependency_upgrade", "config_change") else "medium",
+            "confidence": "high"
+            if approach in ("dependency_upgrade", "config_change")
+            else "medium",
             "estimated_effort": "small" if approach == "config_change" else "medium",
             "blast_radius": "module" if approach == "code_change" else "service",
         },

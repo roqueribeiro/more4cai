@@ -127,8 +127,10 @@ async def triage_batch(
         batch = eligible[i : i + batch_size]
         log.info("ai.triage_batch", batch=i // batch_size + 1, size=len(batch))
         try:
-            user = _TRIAGE_INSTRUCTIONS + "\n\nFINDINGS:\n" + json.dumps(
-                [_finding_to_compact(f) for f in batch], ensure_ascii=False
+            user = (
+                _TRIAGE_INSTRUCTIONS
+                + "\n\nFINDINGS:\n"
+                + json.dumps([_finding_to_compact(f) for f in batch], ensure_ascii=False)
             )
             response = await complete_json(
                 [

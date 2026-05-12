@@ -77,9 +77,7 @@ async def create_scan(
 
 
 @router.get("/{scan_id}", response_model=ScanOut)
-async def get_scan(
-    scan_id: UUID, session: SessionDep, _token: TokenDep
-) -> ScanOut:
+async def get_scan(scan_id: UUID, session: SessionDep, _token: TokenDep) -> ScanOut:
     scan = await session.get(ScanRow, scan_id)
     if scan is None:
         raise HTTPException(404, "scan não encontrado")

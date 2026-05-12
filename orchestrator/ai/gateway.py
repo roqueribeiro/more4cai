@@ -219,7 +219,9 @@ async def complete_json(
         # array `triages` e fechar manualmente o último objeto incompleto.
         recovered = _recover_truncated_triages(text)
         if recovered is not None:
-            log.warning("llm.json_recovered_from_truncation", items=len(recovered.get("triages", [])))
+            log.warning(
+                "llm.json_recovered_from_truncation", items=len(recovered.get("triages", []))
+            )
             return recovered
         raise
 

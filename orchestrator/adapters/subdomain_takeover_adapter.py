@@ -48,8 +48,10 @@ class SubdomainTakeoverAdapter:
         for b in (self.subfinder, self.httpx, self.nuclei):
             try:
                 p = await asyncio.create_subprocess_exec(
-                    b, "-version",
-                    stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
+                    b,
+                    "-version",
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
                 )
                 await p.communicate()
                 if p.returncode != 0:
@@ -70,16 +72,28 @@ class SubdomainTakeoverAdapter:
         async def _run() -> Path:
             # 1. subfinder
             sf = await asyncio.create_subprocess_exec(
-                self.subfinder, "-d", target.value, "-silent", "-o", str(subs_path),
-                stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.PIPE,
+                self.subfinder,
+                "-d",
+                target.value,
+                "-silent",
+                "-o",
+                str(subs_path),
+                stdout=asyncio.subprocess.DEVNULL,
+                stderr=asyncio.subprocess.PIPE,
             )
             await sf.communicate()
 
             # 2. httpx (filtra subs vivos)
             if subs_path.exists():
                 hx = await asyncio.create_subprocess_exec(
-                    self.httpx, "-l", str(subs_path), "-silent", "-o", str(live_path),
-                    stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.PIPE,
+                    self.httpx,
+                    "-l",
+                    str(subs_path),
+                    "-silent",
+                    "-o",
+                    str(live_path),
+                    stdout=asyncio.subprocess.DEVNULL,
+                    stderr=asyncio.subprocess.PIPE,
                 )
                 await hx.communicate()
 
@@ -87,13 +101,17 @@ class SubdomainTakeoverAdapter:
             if live_path.exists():
                 nu = await asyncio.create_subprocess_exec(
                     self.nuclei,
-                    "-l", str(live_path),
-                    "-t", "http/takeovers/",
+                    "-l",
+                    str(live_path),
+                    "-t",
+                    "http/takeovers/",
                     "-jsonl",
-                    "-o", str(out_path),
+                    "-o",
+                    str(out_path),
                     "-silent",
                     "-no-color",
-                    stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.PIPE,
+                    stdout=asyncio.subprocess.DEVNULL,
+                    stderr=asyncio.subprocess.PIPE,
                 )
                 await nu.communicate()
 

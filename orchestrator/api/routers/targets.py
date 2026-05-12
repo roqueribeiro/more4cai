@@ -77,9 +77,7 @@ async def list_targets(session: SessionDep, _token: TokenDep) -> list[TargetOut]
 
 
 @router.get("/{target_id}", response_model=TargetOut)
-async def get_target(
-    target_id: UUID, session: SessionDep, _token: TokenDep
-) -> TargetOut:
+async def get_target(target_id: UUID, session: SessionDep, _token: TokenDep) -> TargetOut:
     row = await session.get(TargetRow, target_id)
     if row is None:
         raise HTTPException(404, "target não encontrado")

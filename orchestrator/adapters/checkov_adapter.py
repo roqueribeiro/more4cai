@@ -50,8 +50,10 @@ class CheckovAdapter:
     async def health(self) -> bool:
         try:
             p = await asyncio.create_subprocess_exec(
-                self.bin, "--version",
-                stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
+                self.bin,
+                "--version",
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
             )
             await p.communicate()
             return p.returncode == 0
@@ -65,8 +67,10 @@ class CheckovAdapter:
 
         cmd = [
             self.bin,
-            "-d", target.value,
-            "-o", "json",
+            "-d",
+            target.value,
+            "-o",
+            "json",
             "--quiet",
             "--soft-fail",
         ]
@@ -78,7 +82,9 @@ class CheckovAdapter:
         async def _run() -> int:
             with out_path.open("wb") as f:
                 p = await asyncio.create_subprocess_exec(
-                    *cmd, stdout=f, stderr=asyncio.subprocess.PIPE,
+                    *cmd,
+                    stdout=f,
+                    stderr=asyncio.subprocess.PIPE,
                 )
                 await p.communicate()
                 return p.returncode or 0
@@ -113,7 +119,7 @@ class CheckovAdapter:
         runs = payload if isinstance(payload, list) else [payload]
 
         for run in runs:
-            results = (run.get("results") or {})
+            results = run.get("results") or {}
             failed = results.get("failed_checks") or []
             for check in failed:
                 sev_str = (check.get("severity") or "MEDIUM").upper()
@@ -139,7 +145,9 @@ class CheckovAdapter:
                         evidence=[
                             Evidence(
                                 description=f"resource={check.get('resource')}",
-                                snippet=(check.get("code_block") or "")[:400] if isinstance(check.get("code_block"), str) else None,
+                                snippet=(check.get("code_block") or "")[:400]
+                                if isinstance(check.get("code_block"), str)
+                                else None,
                             )
                         ],
                         remediation=check.get("guideline"),

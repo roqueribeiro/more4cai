@@ -75,11 +75,15 @@ class NucleiAdapter:
 
         cmd = [
             self.nuclei_bin,
-            "-u", target.value,
+            "-u",
+            target.value,
             "-jsonl",
-            "-o", str(out_path),
-            "-rl", rate_limit,
-            "-severity", severity_filter,
+            "-o",
+            str(out_path),
+            "-rl",
+            rate_limit,
+            "-severity",
+            severity_filter,
             "-silent",
             "-no-color",
         ]

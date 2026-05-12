@@ -68,9 +68,7 @@ async def run_exposure_job(
     """Job arq: pipeline OSINT/Exposure."""
     from orchestrator.jobs.exposure import run_exposure_scan
 
-    log.info(
-        "exposure.started", company=company_name, domains=domains, github_orgs=github_orgs
-    )
+    log.info("exposure.started", company=company_name, domains=domains, github_orgs=github_orgs)
 
     result = await run_exposure_scan(
         company_name=company_name,

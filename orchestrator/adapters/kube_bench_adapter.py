@@ -41,8 +41,10 @@ class KubeBenchAdapter:
     async def health(self) -> bool:
         try:
             p = await asyncio.create_subprocess_exec(
-                self.bin, "version",
-                stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
+                self.bin,
+                "version",
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
             )
             await p.communicate()
             return p.returncode == 0
@@ -56,7 +58,8 @@ class KubeBenchAdapter:
         cmd = [
             self.bin,
             "run",
-            "--targets", targets_arg,
+            "--targets",
+            targets_arg,
             "--json",
         ]
 
@@ -65,7 +68,9 @@ class KubeBenchAdapter:
         async def _run() -> int:
             with out_path.open("wb") as f:
                 p = await asyncio.create_subprocess_exec(
-                    *cmd, stdout=f, stderr=asyncio.subprocess.PIPE,
+                    *cmd,
+                    stdout=f,
+                    stderr=asyncio.subprocess.PIPE,
                 )
                 await p.communicate()
                 return p.returncode or 0

@@ -23,8 +23,8 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy import desc, func
 from sqlmodel import select
 
-from orchestrator.api.deps import SessionDep
 from orchestrator.ai.observability import sse_stream
+from orchestrator.api.deps import SessionDep
 from orchestrator.config import settings
 from orchestrator.persistence.models import AIRun, FindingRow, ScanRow, TargetRow
 
@@ -85,9 +85,7 @@ async def list_scans(
 
 
 @router.get("/scans/{scan_id}")
-async def scan_detail(
-    scan_id: UUID, session: SessionDep, _token: UIToken
-) -> dict[str, Any]:
+async def scan_detail(scan_id: UUID, session: SessionDep, _token: UIToken) -> dict[str, Any]:
     s = await session.get(ScanRow, scan_id)
     if s is None:
         raise HTTPException(404, "scan não encontrado")
@@ -172,9 +170,7 @@ async def list_ai_runs(
     _token: UIToken,
     limit: int = Query(default=100, le=500),
 ) -> list[dict[str, Any]]:
-    rows = (
-        await session.exec(select(AIRun).order_by(desc(AIRun.created_at)).limit(limit))
-    ).all()
+    rows = (await session.exec(select(AIRun).order_by(desc(AIRun.created_at)).limit(limit))).all()
     return [
         {
             "id": str(r.id),
@@ -196,13 +192,9 @@ async def list_ai_runs(
 
 
 @router.get("/ai-runs/stats")
-async def ai_run_stats(
-    session: SessionDep, _token: UIToken
-) -> dict[str, Any]:
+async def ai_run_stats(session: SessionDep, _token: UIToken) -> dict[str, Any]:
     """Agregações leves sobre últimas 1000 calls."""
-    rows = (
-        await session.exec(select(AIRun).order_by(desc(AIRun.created_at)).limit(1000))
-    ).all()
+    rows = (await session.exec(select(AIRun).order_by(desc(AIRun.created_at)).limit(1000))).all()
     if not rows:
         return {
             "total": 0,
@@ -220,9 +212,9 @@ async def ai_run_stats(
         "total": len(rows),
         "by_model": [{"model": m, "count": c} for m, c in by_model.most_common(10)],
         "latency_p50": int(statistics.median(latencies)) if latencies else 0,
-        "latency_p95": int(latencies[int(len(latencies) * 0.95)]) if len(latencies) >= 20 else (
-            int(latencies[-1]) if latencies else 0
-        ),
+        "latency_p95": int(latencies[int(len(latencies) * 0.95)])
+        if len(latencies) >= 20
+        else (int(latencies[-1]) if latencies else 0),
         "fallback_rate": round(fallback_count / len(rows), 3),
         "success_rate": round(success_count / len(rows), 3),
     }

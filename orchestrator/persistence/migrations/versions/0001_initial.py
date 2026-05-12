@@ -10,9 +10,8 @@ from __future__ import annotations
 from collections.abc import Sequence
 
 import sqlalchemy as sa
-from alembic import op
-from sqlalchemy.dialects import postgresql
 import sqlmodel  # noqa: F401  (alembic uses repr for SQLModel types)
+from alembic import op
 
 revision: str = "0001"
 down_revision: str | None = None

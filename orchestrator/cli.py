@@ -49,7 +49,9 @@ def scan(
     target: Annotated[str, typer.Argument(help="URL ou host alvo")],
     asset_type: Annotated[str, typer.Option(help="host|url|domain")] = "url",
     criticality: Annotated[str, typer.Option(help="info|low|medium|high|critical")] = "medium",
-    contains_pii: Annotated[bool, typer.Option(help="alvo trata dados pessoais (rota AI local)")] = False,
+    contains_pii: Annotated[
+        bool, typer.Option(help="alvo trata dados pessoais (rota AI local)")
+    ] = False,
     skip_ai: Annotated[bool, typer.Option(help="pula triagem AI")] = False,
     active_zap: Annotated[bool, typer.Option(help="ZAP active scan (mais agressivo)")] = False,
 ) -> None:
@@ -64,9 +66,7 @@ def scan(
     )
 
     console.print(f"[bold cyan]CAI[/] starting scan against [bold]{t.value}[/]")
-    console.print(
-        f"  asset_type={t.asset_type} criticality={t.criticality} pii={t.contains_pii}"
-    )
+    console.print(f"  asset_type={t.asset_type} criticality={t.criticality} pii={t.contains_pii}")
     console.print()
 
     options = {"zap": {"active": active_zap}}

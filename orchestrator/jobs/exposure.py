@@ -9,7 +9,6 @@ Read-only sobre dados públicos.
 from __future__ import annotations
 
 import asyncio
-from typing import Any
 from uuid import uuid4
 
 import structlog
@@ -22,7 +21,7 @@ from orchestrator.adapters.subdomain_takeover_adapter import SubdomainTakeoverAd
 from orchestrator.adapters.trufflehog_adapter import TrufflehogAdapter
 from orchestrator.ai.analyzer import triage_batch
 from orchestrator.config import settings
-from orchestrator.domain.schemas import AssetType, Finding, Target
+from orchestrator.domain.schemas import AssetType, Target
 from orchestrator.jobs.pipelines import ScanResult, _run_adapter
 from orchestrator.reporting.renderer import render_html
 

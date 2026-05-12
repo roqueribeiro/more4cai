@@ -63,7 +63,7 @@ class Settings(BaseSettings):
     PHOENIX_COLLECTOR_ENDPOINT: str = "http://phoenix:6006/v1/traces"
 
     # API auth (token simples; pentester comercial num engagement)
-    APP_TOKEN: str = "dev-changeme"   # token simples API; trocar em prod
+    APP_TOKEN: str = "dev-changeme"  # token simples API; trocar em prod
 
     # OIDC (Fase 6 stub)
     OIDC_ISSUER: str = ""

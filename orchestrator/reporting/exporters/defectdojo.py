@@ -51,9 +51,7 @@ async def export_scan(
         if scan is None:
             raise ValueError(f"scan {scan_id} não encontrado")
         target = await s.get(TargetRow, scan.target_id)
-        rows = (
-            await s.exec(select(FindingRow).where(FindingRow.scan_id == scan_id))
-        ).all()
+        rows = (await s.exec(select(FindingRow).where(FindingRow.scan_id == scan_id))).all()
 
     # Generic Findings Import format
     findings_json = {
@@ -104,5 +102,7 @@ async def export_scan(
         resp.raise_for_status()
         result = resp.json()
 
-    log.info("defectdojo.exported", scan_id=str(scan_id), test_id=result.get("test"), count=len(rows))
+    log.info(
+        "defectdojo.exported", scan_id=str(scan_id), test_id=result.get("test"), count=len(rows)
+    )
     return result

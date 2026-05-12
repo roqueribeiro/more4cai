@@ -13,9 +13,7 @@ from re import Pattern
 from typing import Final
 
 # CPF: 11 dígitos, com ou sem pontuação
-_CPF: Final[Pattern[str]] = re.compile(
-    r"\b(\d{3}[\.\-\s]?\d{3}[\.\-\s]?\d{3}[\.\-\s]?\d{2})\b"
-)
+_CPF: Final[Pattern[str]] = re.compile(r"\b(\d{3}[\.\-\s]?\d{3}[\.\-\s]?\d{3}[\.\-\s]?\d{2})\b")
 
 # CNPJ: 14 dígitos
 _CNPJ: Final[Pattern[str]] = re.compile(
@@ -23,9 +21,7 @@ _CNPJ: Final[Pattern[str]] = re.compile(
 )
 
 # PAN (cartão): 13-19 dígitos, com ou sem espaços/hífens. Validação Luhn opcional.
-_PAN: Final[Pattern[str]] = re.compile(
-    r"\b(?:\d[ -]*?){13,19}\b"
-)
+_PAN: Final[Pattern[str]] = re.compile(r"\b(?:\d[ -]*?){13,19}\b")
 
 # CVV: 3-4 dígitos próximos à palavra "cvv", "cvc", "security code"
 _CVV: Final[Pattern[str]] = re.compile(
@@ -34,14 +30,10 @@ _CVV: Final[Pattern[str]] = re.compile(
 )
 
 # Email
-_EMAIL: Final[Pattern[str]] = re.compile(
-    r"\b[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}\b"
-)
+_EMAIL: Final[Pattern[str]] = re.compile(r"\b[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}\b")
 
 # JWT (3 partes base64.base64.base64)
-_JWT: Final[Pattern[str]] = re.compile(
-    r"\beyJ[a-zA-Z0-9_\-]+\.[a-zA-Z0-9_\-]+\.[a-zA-Z0-9_\-]+\b"
-)
+_JWT: Final[Pattern[str]] = re.compile(r"\beyJ[a-zA-Z0-9_\-]+\.[a-zA-Z0-9_\-]+\.[a-zA-Z0-9_\-]+\b")
 
 # AWS access key
 _AWS_KEY: Final[Pattern[str]] = re.compile(r"\b(AKIA|ASIA)[A-Z0-9]{16}\b")
@@ -114,9 +106,7 @@ def scrub_dict(data: dict[str, object]) -> dict[str, object]:
             out[k] = scrub_dict(v)
         elif isinstance(v, list):
             out[k] = [
-                scrub(x) if isinstance(x, str)
-                else scrub_dict(x) if isinstance(x, dict)
-                else x
+                scrub(x) if isinstance(x, str) else scrub_dict(x) if isinstance(x, dict) else x
                 for x in v
             ]
         else:

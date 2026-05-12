@@ -9,8 +9,7 @@ from pathlib import Path
 from typing import Any
 
 import structlog
-from libnmap.parser import NmapParser
-from libnmap.parser import NmapParserException
+from libnmap.parser import NmapParser, NmapParserException
 
 from orchestrator.domain.schemas import (
     AssetType,
@@ -78,9 +77,7 @@ class NmapAdapter:
             metadata={"target": target.value, "xml_path": str(xml_path), "cmd": cmd},
         )
 
-    async def _await_proc(
-        self, proc: asyncio.subprocess.Process
-    ) -> tuple[int, str]:
+    async def _await_proc(self, proc: asyncio.subprocess.Process) -> tuple[int, str]:
         _, stderr = await proc.communicate()
         return (proc.returncode or 0), stderr.decode(errors="replace")
 
@@ -115,7 +112,11 @@ class NmapAdapter:
 
         for host in report.hosts:
             host_addr = host.address
-            host_target = Target(asset_type=AssetType.HOST, value=host_addr, label=host.hostnames[0] if host.hostnames else None)
+            host_target = Target(
+                asset_type=AssetType.HOST,
+                value=host_addr,
+                label=host.hostnames[0] if host.hostnames else None,
+            )
 
             for service in host.services:
                 if service.state != "open":
@@ -158,6 +159,7 @@ class NmapAdapter:
         # aceita URL ou host; nmap quer só host/IP/CIDR
         if "://" in value:
             from urllib.parse import urlparse
+
             return urlparse(value).hostname or value
         return value.split("/")[0]  # remove path se vier "host:port/path"
 
@@ -170,7 +172,16 @@ class NmapAdapter:
         # serviços de risco alto se expostos sem motivo
         if s in {"telnet", "ftp", "rsh", "rexec", "rlogin", "tftp"}:
             return Severity.HIGH
-        if s in {"smb", "netbios-ssn", "microsoft-ds", "ms-sql-s", "mysql", "postgresql", "mongodb", "redis"}:
+        if s in {
+            "smb",
+            "netbios-ssn",
+            "microsoft-ds",
+            "ms-sql-s",
+            "mysql",
+            "postgresql",
+            "mongodb",
+            "redis",
+        }:
             return Severity.MEDIUM
         if port in {22, 80, 443, 8080, 8443}:
             return Severity.INFO

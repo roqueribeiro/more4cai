@@ -27,6 +27,7 @@ async def shutdown(ctx: dict) -> None:
 # que por sua vez importam pipelines.
 def _functions() -> list:
     from orchestrator.jobs import workers
+
     return [
         workers.run_scan_job,
         workers.run_exposure_job,

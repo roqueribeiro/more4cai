@@ -38,8 +38,10 @@ class DnstwistAdapter:
     async def health(self) -> bool:
         try:
             p = await asyncio.create_subprocess_exec(
-                self.bin, "--version",
-                stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
+                self.bin,
+                "--version",
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
             )
             await p.communicate()
             return p.returncode == 0
@@ -53,7 +55,8 @@ class DnstwistAdapter:
         out_path = Path(tempfile.mkdtemp(prefix="cai-dnstwist-")) / "out.json"
         cmd = [
             self.bin,
-            "--format", "json",
+            "--format",
+            "json",
             "--registered",  # só retornar permutações registradas
             "--mxcheck",
             "--whois",

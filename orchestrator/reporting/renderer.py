@@ -5,9 +5,9 @@ PDF (WeasyPrint) é opcional via `pip install -e .[pdf]`.
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from pathlib import Path
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
@@ -55,7 +55,7 @@ def _selectattr_severity(
 _env.filters["selectattr_severity"] = _selectattr_severity
 
 
-def render_html(result: "ScanResult", out_path: Path) -> Path:
+def render_html(result: ScanResult, out_path: Path) -> Path:
     """Relatório técnico HTML (template default)."""
 
     sorted_findings = sorted(
@@ -82,7 +82,7 @@ def render_html(result: "ScanResult", out_path: Path) -> Path:
 
 
 def render_executive(
-    result: "ScanResult",
+    result: ScanResult,
     out_path: Path,
     *,
     actor: str | None = None,
