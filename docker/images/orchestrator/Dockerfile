@@ -1,4 +1,4 @@
-FROM python:3.13-slim AS base
+FROM python:3.14-slim AS base
 
 # nmap dentro do orchestrator pra adapter funcionar mesmo sem kali-toolbox em ar.
 # Para scanners pesados (nuclei, gitleaks, trufflehog, dnstwist) usamos o kali-toolbox.
