@@ -1,0 +1,65 @@
+# Scanners externos — ZAP, Trivy, kali-toolbox.
+# Subir junto com compose.yml via --profile scanners.
+
+name: cai
+
+services:
+  zap:
+    image: zaproxy/zap-stable:latest
+    container_name: cai-zap
+    command:
+      - zap.sh
+      - -daemon
+      - -host
+      - 0.0.0.0
+      - -port
+      - "8090"
+      - -config
+      - api.disablekey=false
+      - -config
+      - api.key=${ZAP_API_KEY:-changeme}
+      - -config
+      - api.addrs.addr.name=.*
+      - -config
+      - api.addrs.addr.regex=true
+    ports:
+      - "127.0.0.1:8090:8090"
+    networks:
+      - cai-net
+    profiles:
+      - scanners
+
+  trivy:
+    image: aquasec/trivy:latest
+    container_name: cai-trivy
+    command: ["server", "--listen", "0.0.0.0:4954"]
+    ports:
+      - "127.0.0.1:4954:4954"
+    volumes:
+      - trivy_cache:/root/.cache/trivy
+    networks:
+      - cai-net
+    profiles:
+      - scanners
+
+  kali-toolbox:
+    build:
+      context: ..
+      dockerfile: docker/images/kali-toolbox/Dockerfile
+    image: cai-kali-toolbox:dev
+    container_name: cai-kali-toolbox
+    cap_add:
+      - NET_RAW
+      - NET_ADMIN
+    networks:
+      - cai-net
+    volumes:
+      - kali_workspace:/workspace
+    # mantém container rodando pra docker exec
+    command: ["sleep", "infinity"]
+    profiles:
+      - scanners
+
+volumes:
+  trivy_cache:
+  kali_workspace:

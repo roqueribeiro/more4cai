@@ -1,0 +1,28 @@
+# Caddy reverse proxy com TLS interno automático (Fase 6).
+# Cria CA local e emite certs pros serviços expostos.
+# Para AD/SSO real, integre com seu PKI corporativo.
+#
+# Sobe: --profile proxy
+
+name: cai
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    container_name: cai-caddy
+    ports:
+      - "127.0.0.1:443:443"
+    volumes:
+      - ../docker/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - orchestrator
+    networks:
+      - cai-net
+    profiles:
+      - proxy
+
+volumes:
+  caddy_data:
+  caddy_config:

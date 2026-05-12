@@ -1,0 +1,57 @@
+name: Feature request
+description: Propose a new capability or improvement.
+title: "[feat] "
+labels: ["enhancement", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please discuss non-trivial features here before opening a PR.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem statement
+      description: What are you trying to accomplish? What's getting in the way today?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: How would you like to see this solved? Sketch the API / UX / config knobs.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Primary area
+      options:
+        - Adapter (new or improved scanner integration)
+        - AI / triage / prompts
+        - API / REST surface
+        - Dashboard UI
+        - Reporting / AI Fix Bundle
+        - Compliance / audit / scrubber
+        - Docker / DevEx
+        - Documentation
+        - Other
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: confirm
+    attributes:
+      label: Confirmation
+      options:
+        - label: I have searched existing issues and discussions.
+          required: true
+        - label: This is not a security vulnerability (those go to SECURITY.md).
+          required: true

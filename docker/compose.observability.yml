@@ -1,0 +1,23 @@
+# Phoenix tracing — observabilidade pra LLM calls e tool use (Fase 4+).
+# Subir: --profile obs
+
+name: cai
+
+services:
+  phoenix:
+    image: arizephoenix/phoenix:latest
+    container_name: cai-phoenix
+    ports:
+      - "127.0.0.1:6006:6006"
+      - "127.0.0.1:4317:4317"  # OTLP gRPC
+    volumes:
+      - phoenix_data:/data
+    environment:
+      PHOENIX_WORKING_DIR: /data
+    networks:
+      - cai-net
+    profiles:
+      - obs
+
+volumes:
+  phoenix_data:

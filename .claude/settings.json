@@ -1,0 +1,94 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "allow": [
+      "Bash(make:*)",
+      "Bash(docker:*)",
+      "Bash(docker compose:*)",
+      "Bash(python:*)",
+      "Bash(python3:*)",
+      "Bash(uv:*)",
+      "Bash(pip:*)",
+      "Bash(pytest:*)",
+      "Bash(ruff:*)",
+      "Bash(mypy:*)",
+      "Bash(alembic:*)",
+      "Bash(uvicorn:*)",
+      "Bash(arq:*)",
+      "Bash(git status)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git branch:*)",
+      "Bash(git show:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git stash:*)",
+      "Bash(curl:*)",
+      "Bash(nmap:*)",
+      "Bash(dig:*)",
+      "Bash(host:*)",
+      "Bash(nslookup:*)",
+      "Bash(whois:*)",
+      "Bash(openssl:*)",
+      "Bash(ping:*)",
+      "Bash(jq:*)",
+      "Bash(cat:*)",
+      "Bash(ls:*)",
+      "Bash(find:*)",
+      "Bash(head:*)",
+      "Bash(tail:*)",
+      "Bash(echo:*)",
+      "Bash(grep:*)",
+      "Bash(rg:*)",
+      "Bash(wc:*)",
+      "Bash(sort:*)",
+      "Bash(uniq:*)",
+      "Bash(cp:*)",
+      "Bash(mkdir:*)",
+      "Bash(touch:*)",
+      "Bash(chmod +x:*)",
+      "Read(./**)",
+      "Glob(./**)",
+      "Grep(./**)"
+    ],
+    "ask": [
+      "Bash(rm:*)",
+      "Bash(git push:*)",
+      "Bash(git reset:*)",
+      "Bash(git rebase:*)",
+      "Bash(git checkout:*)",
+      "Bash(make clean:*)",
+      "Bash(docker system prune:*)"
+    ],
+    "deny": [
+      "Bash(rm -rf /:*)",
+      "Read(.env)",
+      "Read(.env.local)",
+      "Read(./secrets/**)",
+      "Read(./backups/**)",
+      "Bash(git push --force:*)",
+      "Bash(git push -f:*)"
+    ]
+  },
+  "env": {
+    "LOG_FORMAT": "json"
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python ${CLAUDE_PROJECT_DIR}/.claude/hooks/format-python.py",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "echo \"CAI | $(basename $CLAUDE_PROJECT_DIR) | model:$CLAUDE_MODEL_ID\""
+  }
+}

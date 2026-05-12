@@ -1,0 +1,36 @@
+# Alvos vulneráveis. NUNCA expor essas portas pra fora do localhost.
+# Sobe: --profile lab
+
+name: cai
+
+services:
+  juice-shop:
+    image: bkimminich/juice-shop:latest
+    container_name: cai-juice-shop
+    ports:
+      - "127.0.0.1:3000:3000"
+    networks:
+      - cai-net
+    profiles:
+      - lab
+
+  dvwa:
+    image: vulnerables/web-dvwa:latest
+    container_name: cai-dvwa
+    ports:
+      - "127.0.0.1:8000:80"
+    networks:
+      - cai-net
+    profiles:
+      - lab
+
+  webgoat:
+    image: webgoat/webgoat:latest
+    container_name: cai-webgoat
+    ports:
+      - "127.0.0.1:8081:8080"
+      - "127.0.0.1:9090:9090"
+    networks:
+      - cai-net
+    profiles:
+      - lab

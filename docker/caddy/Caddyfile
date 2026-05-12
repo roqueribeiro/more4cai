@@ -1,0 +1,31 @@
+# Caddy reverse proxy — TLS interno (CA local automática).
+# Acesso: https://cai.local/ (mapear no /etc/hosts ou DNS interno).
+
+cai.local {
+    tls internal
+
+    handle /api/* {
+        uri strip_prefix /api
+        reverse_proxy orchestrator:8080
+    }
+
+    handle /reports/* {
+        reverse_proxy orchestrator:8080
+    }
+
+    handle /health {
+        reverse_proxy orchestrator:8080
+    }
+
+    handle / {
+        respond "CAI Orchestrator behind Caddy. Use /api/*, /reports/*, /health"
+    }
+
+    log {
+        output file /data/access.log {
+            roll_size 100mb
+            roll_keep 10
+        }
+        format json
+    }
+}

@@ -1,0 +1,16 @@
+/* CAI dashboard — minor polish on top of Tailwind. */
+
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: #0b1220; }
+::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #334155; }
+
+body { font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11'; }
+
+[x-cloak] { display: none !important; }
+
+table { border-collapse: separate; border-spacing: 0; }
+table thead th { font-weight: 500; }
+
+/* fade in pra updates de polling */
+[x-show] { transition: opacity 0.15s ease; }

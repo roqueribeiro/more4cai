@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <title>CAI — Cockpit de Scan</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = { darkMode: 'class', theme: { extend: { colors: {
+      bg: '#0b1220', panel: '#111a2c', border: '#1e293b',
+      accent: '#3b82f6', accent2: '#8b5cf6',
+      ok: '#10b981', warn: '#f59e0b', down: '#ef4444', muted: '#64748b',
+    } } } }
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+</head>
+<body class="bg-bg text-slate-200 min-h-screen font-sans antialiased">
+
+<div x-data="cockpit()" x-init="init()" class="max-w-6xl mx-auto p-6 space-y-6">
+
+  <header class="flex items-center justify-between">
+    <div>
+      <a href="/ui/" class="text-xs text-muted hover:text-accent">← Dashboard</a>
+      <h1 class="text-2xl font-semibold mt-1">Cockpit · <span class="font-mono text-base text-muted" x-text="scanId.slice(0, 8) + '...'"></span></h1>
+      <p class="text-xs text-muted mt-1" x-text="scan?.target?.value || 'carregando...'"></p>
+    </div>
+    <div class="text-right">
+      <div :class="stateColor(scan?.state)" class="text-xs px-3 py-1 rounded inline-block" x-text="scan?.state || '...'"></div>
+      <div class="text-xs text-muted mt-1" x-text="elapsed()"></div>
+    </div>
+  </header>
+
+  <!-- Phase Timeline -->
+  <section class="bg-panel border border-border rounded-lg p-5">
+    <div class="text-xs uppercase tracking-wider text-muted mb-4">Phase Timeline</div>
+    <div class="flex items-center gap-2 overflow-x-auto pb-2">
+      <template x-for="(p, idx) in phases" :key="p.key">
+        <div class="flex items-center gap-2 shrink-0">
+          <div class="flex flex-col items-center">
+            <div :class="phaseStyle(p.key)" class="w-10 h-10 rounded-full flex items-center justify-center text-lg transition">
+              <span x-text="phaseIcon(p.key)"></span>
+            </div>
+            <div class="text-[10px] text-muted mt-1.5 uppercase tracking-wider" x-text="p.label"></div>
+            <div x-show="phaseStatus(p.key) === 'running' && phaseProgress" class="text-[10px] text-accent font-mono" x-text="phaseProgress + '%'"></div>
+          </div>
+          <div x-show="idx < phases.length - 1" :class="phaseStatus(p.key) === 'done' ? 'bg-ok' : 'bg-border'" class="h-0.5 w-8 transition"></div>
+        </div>
+      </template>
+    </div>
+  </section>
+
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+    <!-- Findings (live) -->
+    <section class="bg-panel border border-border rounded-lg p-5 lg:col-span-2">
+      <div class="flex items-center justify-between mb-3">
+        <div class="text-xs uppercase tracking-wider text-muted">Findings ao vivo</div>
+        <span class="text-xs text-muted" x-text="`${findings.length} de ${scan?.severity_counts ? Object.values(scan.severity_counts).reduce((a,b)=>a+b,0) : 0}`"></span>
+      </div>
+      <div class="space-y-1 max-h-[50vh] overflow-y-auto">
+        <template x-for="f in findings.slice(0, 50)" :key="f.id">
+          <div class="flex items-center gap-3 py-1.5 px-2 hover:bg-bg rounded transition">
+            <span :class="sevColor(f.severity)" class="text-xs px-2 py-0.5 rounded font-mono shrink-0 w-16 text-center" x-text="f.severity"></span>
+            <span class="text-xs text-muted shrink-0" x-text="f.source_tool"></span>
+            <span class="text-xs truncate" x-text="f.title"></span>
+            <span x-show="f.vuln_id" class="ml-auto text-xs font-mono text-accent2 shrink-0" x-text="f.vuln_id"></span>
+          </div>
+        </template>
+        <div x-show="!findings.length" class="text-muted py-12 text-center text-sm">Sem findings ainda.</div>
+      </div>
+    </section>
+
+    <!-- AI Calls deste scan -->
+    <section class="bg-panel border border-border rounded-lg p-5">
+      <div class="text-xs uppercase tracking-wider text-muted mb-3">AI Calls deste scan</div>
+      <div class="space-y-2 max-h-[50vh] overflow-y-auto">
+        <template x-for="r in scan?.ai_runs || []" :key="r.id">
+          <div class="text-xs border-b border-border/50 pb-2">
+            <div class="flex items-center justify-between">
+              <span :class="r.success ? 'text-ok' : 'text-down'" x-text="r.success ? '✓' : '✗'"></span>
+              <span class="text-muted" x-text="r.purpose"></span>
+              <span class="font-mono" x-text="r.latency_ms + 'ms'"></span>
+            </div>
+            <div class="text-muted truncate" x-text="r.model"></div>
+            <div class="text-muted text-[10px]" x-text="`${r.prompt_tokens}p/${r.completion_tokens}c · ${r.finding_count} findings`"></div>
+            <div x-show="r.error" class="text-down text-[10px] truncate mt-1" x-text="r.error"></div>
+          </div>
+        </template>
+        <div x-show="!(scan?.ai_runs || []).length" class="text-muted py-8 text-center text-xs">Sem chamadas LLM.</div>
+      </div>
+    </section>
+  </div>
+
+  <!-- Live logs SSE -->
+  <section class="bg-panel border border-border rounded-lg p-5">
+    <div class="flex items-center justify-between mb-3">
+      <div class="text-xs uppercase tracking-wider text-muted">Live logs (SSE)</div>
+      <span :class="sseConnected ? 'text-ok' : 'text-warn'" class="text-xs">
+        <span :class="sseConnected ? 'bg-ok animate-pulse' : 'bg-warn'" class="inline-block w-1.5 h-1.5 rounded-full mr-1"></span>
+        <span x-text="sseConnected ? 'streaming' : 'desconectado'"></span>
+      </span>
+    </div>
+    <div class="font-mono text-xs h-72 overflow-y-auto bg-bg/50 rounded p-3" id="logsEl">
+      <template x-for="l in logs.slice(-200)" :key="l._key">
+        <div class="py-0.5 flex gap-2">
+          <span class="text-muted shrink-0" x-text="l.timestamp?.slice(11, 19) || ''"></span>
+          <span :class="logLevelColor(l.level)" class="shrink-0 w-12 uppercase text-[10px] mt-0.5" x-text="l.level || ''"></span>
+          <span class="text-accent2 shrink-0" x-text="l.event"></span>
+          <span class="text-slate-400 truncate" x-text="logRest(l)"></span>
+        </div>
+      </template>
+    </div>
+  </section>
+
+  <!-- Bundle download (se done) -->
+  <section x-show="scan?.state === 'done'" class="bg-panel border border-accent/30 rounded-lg p-5">
+    <div class="flex items-center justify-between">
+      <div>
+        <div class="text-sm font-semibold">AI Fix Bundle pronto</div>
+        <div class="text-xs text-muted mt-1">JSON estruturado pra outra IA (Claude Code, Cursor) consumir e propor patches.</div>
+      </div>
+      <div class="flex gap-2">
+        <a :href="`/reports/${scanId}/ai-bundle?token=${encodeURIComponent(token)}`" target="_blank"
+           class="px-4 py-2 text-xs rounded bg-accent text-white hover:bg-accent/90 transition">Baixar bundle JSON</a>
+        <a x-show="scan?.report_path" :href="`/reports/${scanId}?token=${encodeURIComponent(token)}`" target="_blank"
+           class="px-4 py-2 text-xs rounded bg-panel border border-border hover:border-accent transition">Relatório HTML</a>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>

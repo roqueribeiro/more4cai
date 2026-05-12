@@ -1,0 +1,77 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+env/
+
+# uv
+.uv/
+uv.lock
+
+# Test / coverage
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.mypy_cache/
+.ruff_cache/
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets/
+
+# DB / data
+data/
+*.db
+*.sqlite
+*.sqlite3
+
+# Reports / scan artifacts (mantém o diretório, não o conteúdo)
+reports/*
+!reports/.gitkeep
+
+# Logs
+logs/
+*.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker volumes locais (se mapeados)
+docker/volumes/
+
+# Greenbone feed cache (se persistido localmente)
+greenbone-data/
+
+# OSINT config — pode conter strings sensíveis do cliente
+config/exposure_targets.yml
+
+# Backups
+backups/
+cai-pre-publish-backup-*/
+
+# Claude Code — overrides pessoais e artefatos efêmeros
+.claude/settings.local.json
+.claude/plans/
+.claude/local-history/
+.claude/scheduled_tasks.lock
+CLAUDE.local.md

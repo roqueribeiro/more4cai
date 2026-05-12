@@ -1,0 +1,128 @@
+# CAI — base compose. Sobe orchestrator + Postgres + Redis + Ollama.
+#
+# Profiles:
+#   default      orchestrator + db + redis + ollama
+#   scanners     ZAP + Trivy + kali-toolbox
+#   greenbone    stack Greenbone Community (~5GB feed sync inicial)
+#   lab          alvos vulneráveis (Juice Shop, DVWA, WebGoat)
+#   obs          Phoenix tracing
+#   ai-agent     cai-expert (Fase 4)
+#
+# Uso (Makefile esconde os flags):
+#   docker compose -f docker/compose.yml \
+#                  -f docker/compose.scanners.yml \
+#                  -f docker/compose.lab.yml \
+#                  --profile scanners --profile lab up -d
+
+name: cai
+
+services:
+  orchestrator:
+    build:
+      context: ..
+      dockerfile: docker/images/orchestrator/Dockerfile
+    image: cai-orchestrator:dev
+    container_name: cai-orchestrator
+    cap_add:
+      - NET_RAW
+      - NET_ADMIN
+    env_file:
+      - ../.env
+    volumes:
+      - ../reports:/app/reports
+      - ../data:/app/data
+      - ../config:/app/config:ro
+    ports:
+      - "127.0.0.1:8080:8080"
+    networks:
+      - cai-net
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - postgres
+      - redis
+    entrypoint: ["uvicorn"]
+    command: ["orchestrator.main:app", "--host", "0.0.0.0", "--port", "8080"]
+    profiles:
+      - default
+      - scanners
+
+  worker:
+    build:
+      context: ..
+      dockerfile: docker/images/orchestrator/Dockerfile
+    image: cai-orchestrator:dev
+    container_name: cai-worker
+    cap_add:
+      - NET_RAW
+      - NET_ADMIN
+    env_file:
+      - ../.env
+    volumes:
+      - ../reports:/app/reports
+      - ../data:/app/data
+      - ../config:/app/config:ro
+    networks:
+      - cai-net
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - postgres
+      - redis
+    entrypoint: ["arq"]
+    command: ["orchestrator.jobs.queue.WorkerSettings"]
+    profiles:
+      - default
+      - scanners
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: cai-postgres
+    environment:
+      POSTGRES_USER: cai
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cai-dev-changeme}
+      POSTGRES_DB: cai
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - cai-net
+    profiles:
+      - default
+      - scanners
+
+  redis:
+    image: redis:7-alpine
+    container_name: cai-redis
+    networks:
+      - cai-net
+    profiles:
+      - default
+      - scanners
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: cai-ollama
+    ports:
+      - "127.0.0.1:11434:11434"
+    volumes:
+      - ollama_models:/root/.ollama
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    networks:
+      - cai-net
+    profiles:
+      - default
+      - ai-local
+
+networks:
+  cai-net:
+    driver: bridge
+
+volumes:
+  ollama_models:
+  pgdata:

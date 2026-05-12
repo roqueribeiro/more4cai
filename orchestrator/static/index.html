@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>CAI — Continuous AI Security</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            bg: '#0b1220', panel: '#111a2c', border: '#1e293b',
+            accent: '#3b82f6', accent2: '#8b5cf6',
+            ok: '#10b981', warn: '#f59e0b', down: '#ef4444', muted: '#64748b',
+          }
+        }
+      }
+    }
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body class="bg-bg text-slate-200 min-h-screen font-sans antialiased">
+
+<div x-data="dashboard()" x-init="init()" class="flex h-screen overflow-hidden">
+
+  <!-- Sidebar -->
+  <aside class="w-60 bg-panel border-r border-border flex flex-col">
+    <div class="px-5 py-4 border-b border-border">
+      <div class="flex items-center gap-2">
+        <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-accent to-accent2 flex items-center justify-center font-bold">C</div>
+        <div>
+          <div class="font-semibold text-sm">CAI</div>
+          <div class="text-xs text-muted">Continuous AI Security</div>
+        </div>
+      </div>
+    </div>
+
+    <nav class="flex-1 py-3">
+      <template x-for="t in tabs" :key="t.id">
+        <button
+          @click="activeTab = t.id"
+          :class="activeTab === t.id ? 'bg-accent/10 text-accent border-l-2 border-accent' : 'text-slate-400 hover:bg-panel/60 border-l-2 border-transparent'"
+          class="w-full text-left px-5 py-2.5 text-sm flex items-center gap-3 transition">
+          <span x-text="t.icon" class="text-lg"></span>
+          <span x-text="t.label"></span>
+          <span x-show="t.badge !== null" x-text="t.badge" class="ml-auto text-xs px-1.5 py-0.5 rounded bg-accent/20 text-accent"></span>
+        </button>
+      </template>
+    </nav>
+
+    <div class="px-5 py-3 border-t border-border text-xs text-muted">
+      <div class="flex items-center gap-1.5">
+        <span :class="overallStatus === 'ok' ? 'bg-ok' : 'bg-warn'" class="w-1.5 h-1.5 rounded-full"></span>
+        <span x-text="overallStatus === 'ok' ? 'Stack saudável' : 'Stack degradada'"></span>
+      </div>
+      <div class="mt-1 truncate" x-text="`v${version || '...'} · ${nowFmt()}`"></div>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <main class="flex-1 overflow-y-auto">
+    <header class="sticky top-0 z-10 bg-bg/80 backdrop-blur border-b border-border px-8 py-4 flex items-center justify-between">
+      <div>
+        <h1 class="text-xl font-semibold" x-text="tabs.find(t => t.id === activeTab)?.label"></h1>
+        <p class="text-xs text-muted mt-0.5" x-text="tabs.find(t => t.id === activeTab)?.subtitle"></p>
+      </div>
+      <div class="flex items-center gap-2">
+        <button @click="refresh()" class="px-3 py-1.5 text-xs rounded bg-panel border border-border hover:border-accent transition flex items-center gap-1.5">
+          <span>↻</span> <span>Atualizar</span>
+        </button>
+        <input
+          x-model="token"
+          @change="saveToken()"
+          type="password"
+          placeholder="X-API-Token"
+          class="px-3 py-1.5 text-xs rounded bg-panel border border-border focus:border-accent focus:outline-none w-56" />
+      </div>
+    </header>
+
+    <div class="px-8 py-6 space-y-6">
+
+      <!-- ====== DASHBOARD TAB ====== -->
+      <section x-show="activeTab === 'dashboard'" class="space-y-6">
+
+        <!-- Health cards -->
+        <div>
+          <h2 class="text-xs uppercase tracking-wider text-muted mb-3">Stack health</h2>
+          <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+            <template x-for="c in health.components || []" :key="c.name">
+              <div class="bg-panel border border-border rounded-lg p-3">
+                <div class="flex items-center justify-between mb-1">
+                  <span class="text-xs text-muted uppercase" x-text="c.name"></span>
+                  <span :class="{
+                    'bg-ok/20 text-ok': c.status === 'ok',
+                    'bg-down/20 text-down': c.status === 'down',
+                    'bg-muted/20 text-muted': c.status === 'disabled'
+                  }" class="text-xs px-2 py-0.5 rounded" x-text="c.status"></span>
+                </div>
+                <div class="text-sm font-mono" x-text="c.latency_ms + 'ms'"></div>
+                <div class="text-xs text-muted mt-1 truncate" x-text="c.detail?.error || c.detail?.version || (c.detail?.models || []).join(', ') || (c.detail?.keys_configured || []).join(', ') || ''"></div>
+              </div>
+            </template>
+          </div>
+        </div>
+
+        <!-- AI Stats charts -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <div class="bg-panel border border-border rounded-lg p-4">
+            <div class="text-xs uppercase tracking-wider text-muted mb-1">AI Calls</div>
+            <div class="text-2xl font-semibold" x-text="aiStats.total ?? 0"></div>
+            <div class="text-xs text-muted">total · success rate <span x-text="((aiStats.success_rate ?? 1) * 100).toFixed(0) + '%'"></span></div>
+          </div>
+          <div class="bg-panel border border-border rounded-lg p-4">
+            <div class="text-xs uppercase tracking-wider text-muted mb-1">Latência LLM</div>
+            <div class="text-2xl font-semibold"><span x-text="aiStats.latency_p50 ?? 0"></span><span class="text-sm text-muted">ms p50</span></div>
+            <div class="text-xs text-muted"><span x-text="aiStats.latency_p95 ?? 0"></span>ms p95</div>
+          </div>
+          <div class="bg-panel border border-border rounded-lg p-4">
+            <div class="text-xs uppercase tracking-wider text-muted mb-1">Fallback rate</div>
+            <div class="text-2xl font-semibold"><span x-text="((aiStats.fallback_rate ?? 0) * 100).toFixed(1)"></span><span class="text-sm text-muted">%</span></div>
+            <div class="text-xs text-muted">primário caiu pra fallback</div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div class="bg-panel border border-border rounded-lg p-4">
+            <div class="text-xs uppercase tracking-wider text-muted mb-3">Modelos usados</div>
+            <canvas id="chartModels" class="max-h-64"></canvas>
+          </div>
+          <div class="bg-panel border border-border rounded-lg p-4">
+            <div class="text-xs uppercase tracking-wider text-muted mb-3">Severity nos últimos scans</div>
+            <canvas id="chartSeverity" class="max-h-64"></canvas>
+          </div>
+        </div>
+      </section>
+
+      <!-- ====== SCANS TAB ====== -->
+      <section x-show="activeTab === 'scans'" class="space-y-3">
+        <table class="w-full text-sm">
+          <thead class="text-xs uppercase tracking-wider text-muted">
+            <tr class="border-b border-border">
+              <th class="text-left py-2 px-3">Scan</th>
+              <th class="text-left">Alvo</th>
+              <th class="text-left">Estado</th>
+              <th class="text-left">Fase</th>
+              <th class="text-right">Findings</th>
+              <th class="text-right">Severity</th>
+              <th class="text-right">Iniciado</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <template x-for="s in scans" :key="s.id">
+              <tr class="border-b border-border/50 hover:bg-panel/60 transition">
+                <td class="py-2.5 px-3 font-mono text-xs" x-text="s.id.slice(0, 8)"></td>
+                <td class="text-xs truncate max-w-xs" x-text="s.target_value || '-'"></td>
+                <td>
+                  <span :class="stateColor(s.state)" class="text-xs px-2 py-0.5 rounded" x-text="s.state"></span>
+                </td>
+                <td class="text-xs">
+                  <div class="flex items-center gap-2">
+                    <span x-text="s.current_phase || '-'"></span>
+                    <span x-show="s.phase_progress !== null" class="text-muted" x-text="`(${s.phase_progress}%)`"></span>
+                  </div>
+                </td>
+                <td class="text-right font-mono text-xs" x-text="s.total_findings"></td>
+                <td class="text-right">
+                  <span class="inline-flex gap-1 text-xs">
+                    <span x-show="s.severity_counts.critical" class="px-1.5 rounded bg-down/30 text-down" x-text="`C ${s.severity_counts.critical}`"></span>
+                    <span x-show="s.severity_counts.high" class="px-1.5 rounded bg-warn/30 text-warn" x-text="`H ${s.severity_counts.high}`"></span>
+                    <span x-show="s.severity_counts.medium" class="px-1.5 rounded bg-accent/30 text-accent" x-text="`M ${s.severity_counts.medium}`"></span>
+                  </span>
+                </td>
+                <td class="text-right text-xs text-muted" x-text="fmtTime(s.started_at)"></td>
+                <td class="text-right pr-3">
+                  <a :href="`cockpit.html?scan_id=${s.id}&token=${encodeURIComponent(token)}`" class="text-xs text-accent hover:underline">cockpit →</a>
+                </td>
+              </tr>
+            </template>
+            <tr x-show="!scans.length"><td colspan="8" class="py-8 text-center text-muted text-sm">Nenhum scan ainda. Dispare via CLI: <code class="bg-panel px-2 py-0.5 rounded">make scan TARGET=...</code></td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <!-- ====== AI CALLS TAB ====== -->
+      <section x-show="activeTab === 'ai'" class="space-y-3">
+        <table class="w-full text-sm">
+          <thead class="text-xs uppercase tracking-wider text-muted">
+            <tr class="border-b border-border">
+              <th class="text-left py-2 px-3">Quando</th>
+              <th class="text-left">Purpose</th>
+              <th class="text-left">Modelo</th>
+              <th class="text-right">Latência</th>
+              <th class="text-right">Tokens (in/out)</th>
+              <th class="text-right">Findings</th>
+              <th class="text-center">OK?</th>
+              <th class="text-left">Erro</th>
+            </tr>
+          </thead>
+          <tbody>
+            <template x-for="r in aiRuns" :key="r.id">
+              <tr class="border-b border-border/50 hover:bg-panel/60 transition">
+                <td class="py-2 px-3 text-xs text-muted" x-text="fmtTime(r.created_at)"></td>
+                <td class="text-xs">
+                  <span :class="r.purpose.endsWith('.fallback') ? 'text-warn' : 'text-slate-300'" x-text="r.purpose"></span>
+                </td>
+                <td class="text-xs font-mono truncate max-w-xs" x-text="r.model"></td>
+                <td class="text-right text-xs font-mono" x-text="r.latency_ms + 'ms'"></td>
+                <td class="text-right text-xs font-mono text-muted" x-text="`${r.prompt_tokens}/${r.completion_tokens}`"></td>
+                <td class="text-right text-xs font-mono text-muted" x-text="r.finding_count || '-'"></td>
+                <td class="text-center">
+                  <span :class="r.success ? 'text-ok' : 'text-down'" x-text="r.success ? '✓' : '✗'"></span>
+                </td>
+                <td class="text-xs text-down truncate max-w-xs" x-text="r.error || ''"></td>
+              </tr>
+            </template>
+            <tr x-show="!aiRuns.length"><td colspan="8" class="py-8 text-center text-muted text-sm">Nenhuma chamada LLM registrada. Rode um scan sem <code>--skip-ai</code>.</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <!-- ====== LOGS TAB ====== -->
+      <section x-show="activeTab === 'logs'" class="space-y-3">
+        <div class="flex items-center gap-3 text-xs">
+          <span :class="sseConnected ? 'text-ok' : 'text-warn'">
+            <span :class="sseConnected ? 'bg-ok animate-pulse' : 'bg-warn'" class="inline-block w-1.5 h-1.5 rounded-full mr-1"></span>
+            <span x-text="sseConnected ? 'Conectado · streaming' : 'Desconectado'"></span>
+          </span>
+          <button @click="logs = []" class="text-muted hover:text-slate-300">limpar</button>
+          <input x-model="logFilter" placeholder="filtrar (event/level/...)" class="ml-auto px-2 py-1 text-xs rounded bg-panel border border-border focus:border-accent focus:outline-none w-72" />
+        </div>
+        <div class="bg-panel border border-border rounded-lg p-3 font-mono text-xs h-[60vh] overflow-y-auto" id="logsEl">
+          <template x-for="l in logsFiltered()" :key="l._key">
+            <div class="py-0.5 flex gap-2">
+              <span class="text-muted shrink-0" x-text="l.timestamp?.slice(11, 19) || '--:--:--'"></span>
+              <span :class="logLevelColor(l.level)" class="shrink-0 w-12 uppercase text-[10px] mt-0.5" x-text="l.level || 'log'"></span>
+              <span class="text-accent2 shrink-0" x-text="l.event"></span>
+              <span class="text-slate-400 truncate" x-text="logRest(l)"></span>
+            </div>
+          </template>
+          <div x-show="!logs.length" class="text-muted py-8 text-center">Sem logs ainda.</div>
+        </div>
+      </section>
+
+    </div>
+  </main>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>

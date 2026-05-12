@@ -1,0 +1,15 @@
+# Forçar LF em todo lugar — projeto roda em Linux containers.
+# Crucial em dev Windows pra não quebrar shell scripts e Dockerfiles.
+* text=auto eol=lf
+
+*.sh text eol=lf
+Dockerfile text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+Makefile text eol=lf
+
+# Binários
+*.png binary
+*.jpg binary
+*.pdf binary
+*.zip binary

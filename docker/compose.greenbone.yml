@@ -1,0 +1,112 @@
+# Greenbone Community Edition — stack pesada (~20 serviços, ~5GB feed sync inicial).
+#
+# IMPORTANTE: A Greenbone disponibiliza um compose oficial gigante em
+#   https://greenbone.github.io/docs/latest/_static/compose.yaml
+# Nesta versão "minimal", trazemos apenas o essencial para integração via GMP TCP.
+# Para ambiente real, recomendamos baixar o compose oficial e usar `docker compose -f` em conjunto.
+#
+# Subir: docker compose -f docker/compose.yml -f docker/compose.greenbone.yml --profile greenbone up -d
+# Após o feed sync (30min-3h), credenciais default: admin/admin (TROCAR EM PROD).
+
+name: cai
+
+services:
+  greenbone-feeds:
+    image: greenbone/community-data:stable
+    container_name: cai-gvm-feeds
+    volumes:
+      - gvm_data:/var/lib/gvm
+      - openvas_data:/var/lib/openvas
+    networks:
+      - cai-net
+    profiles:
+      - greenbone
+
+  greenbone-redis:
+    image: greenbone/redis-server:stable
+    container_name: cai-gvm-redis
+    volumes:
+      - gvm_redis:/run/redis
+    networks:
+      - cai-net
+    profiles:
+      - greenbone
+
+  greenbone-postgres:
+    image: greenbone/pg-gvm:stable
+    container_name: cai-gvm-postgres
+    volumes:
+      - gvm_pg:/var/lib/postgresql
+    networks:
+      - cai-net
+    profiles:
+      - greenbone
+
+  greenbone-gvmd:
+    image: greenbone/gvmd:stable
+    container_name: cai-gvmd
+    depends_on:
+      - greenbone-postgres
+      - greenbone-feeds
+    volumes:
+      - gvm_data:/var/lib/gvm
+      - gvm_pg:/var/lib/postgresql
+      - /run/gvmd:/run/gvmd
+    networks:
+      - cai-net
+    profiles:
+      - greenbone
+
+  greenbone-ospd:
+    image: greenbone/ospd-openvas:stable
+    container_name: cai-ospd-openvas
+    depends_on:
+      - greenbone-redis
+      - greenbone-feeds
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    volumes:
+      - gvm_redis:/run/redis
+      - openvas_data:/var/lib/openvas
+      - openvas_log:/var/log/openvas
+    networks:
+      - cai-net
+    profiles:
+      - greenbone
+
+  # GMP TCP exposed via socat para acesso do orchestrator (opcional).
+  # Em prod, usar socket Unix montado é mais seguro.
+  greenbone-gmp-tcp:
+    image: alpine/socat:latest
+    container_name: cai-gvm-gmp-tcp
+    depends_on:
+      - greenbone-gvmd
+    command: ["TCP-LISTEN:9390,fork,reuseaddr", "UNIX-CONNECT:/run/gvmd/gvmd.sock"]
+    volumes:
+      - /run/gvmd:/run/gvmd:ro
+    ports:
+      - "127.0.0.1:9390:9390"
+    networks:
+      - cai-net
+    profiles:
+      - greenbone
+
+  greenbone-gsa:
+    image: greenbone/gsa:stable
+    container_name: cai-gsa
+    depends_on:
+      - greenbone-gvmd
+    ports:
+      - "127.0.0.1:9392:80"
+    networks:
+      - cai-net
+    profiles:
+      - greenbone
+
+volumes:
+  gvm_data:
+  gvm_pg:
+  gvm_redis:
+  openvas_data:
+  openvas_log:

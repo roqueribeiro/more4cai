@@ -1,0 +1,133 @@
+[project]
+name = "cai-orchestrator"
+version = "0.1.0"
+description = "Continuous AI Security — vulnerability scanning + AI triage + AI Fix Bundle for AI patchers"
+readme = "README.md"
+requires-python = ">=3.13"
+license = { text = "Apache-2.0" }
+authors = [{ name = "Roque Ribeiro", email = "roqueribeiro@users.noreply.github.com" }]
+maintainers = [{ name = "Roque Ribeiro", email = "roqueribeiro@users.noreply.github.com" }]
+keywords = [
+    "security",
+    "pentest",
+    "vulnerability-scanner",
+    "appsec",
+    "owasp",
+    "ai",
+    "litellm",
+    "fastapi",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Information Technology",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Security",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: System :: Networking :: Monitoring",
+]
+
+dependencies = [
+    # web framework + server
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.32.0",
+    "pydantic>=2.9.0",
+    "pydantic-settings>=2.6.0",
+
+    # persistence (SQLite e Postgres ambos suportados via DATABASE_URL)
+    "sqlmodel>=0.0.22",
+    "aiosqlite>=0.20.0",
+    "asyncpg>=0.30.0",
+    "alembic>=1.14.0",
+    "sqlalchemy[asyncio]>=2.0.36",
+
+    # http async
+    "httpx>=0.27.0",
+
+    # logging estruturado
+    "structlog>=24.4.0",
+
+    # AI gateway
+    "litellm>=1.55.0",
+
+    # scanners — clientes
+    "python-libnmap>=0.7.3",
+    "zaproxy>=0.3.2",
+
+    # fila assíncrona
+    "arq>=0.26.1",
+    "redis>=5.2.0",
+
+    # OSINT (Fase 2.5)
+    "PyGithub>=2.5.0",
+    "shodan>=1.31.0",
+
+    # Greenbone (Fase 3)
+    "python-gvm>=24.8.0",
+
+    # auth (Fase 6)
+    "authlib>=1.3.2",
+    "python-jose[cryptography]>=3.3.0",
+    "passlib[bcrypt]>=1.7.4",
+
+    # relatório
+    "jinja2>=3.1.4",
+    "pyyaml>=6.0.2",
+
+    # CLI
+    "typer>=0.13.0",
+    "rich>=13.9.0",
+]
+
+[project.optional-dependencies]
+# instalação opcional — algumas têm peso nativo grande no Windows
+pdf = ["weasyprint>=63.0"]            # PDF rendering (Fase 5)
+agentic = ["cai-framework>=0.1.0"]    # CAI agentic (Fase 4)
+tracing = ["arize-phoenix>=6.0.0", "openinference-instrumentation-litellm>=0.1.0"]
+censys = ["censys>=2.2.0"]
+dev = [
+    "pytest>=8.3.0",
+    "pytest-asyncio>=0.24.0",
+    "pytest-cov>=6.0.0",
+    "ruff>=0.8.0",
+    "mypy>=1.13.0",
+]
+
+[project.urls]
+Homepage      = "https://github.com/roqueribeiro/more4cai"
+Repository    = "https://github.com/roqueribeiro/more4cai"
+Documentation = "https://github.com/roqueribeiro/more4cai#readme"
+Issues        = "https://github.com/roqueribeiro/more4cai/issues"
+Discussions   = "https://github.com/roqueribeiro/more4cai/discussions"
+Changelog     = "https://github.com/roqueribeiro/more4cai/blob/main/CHANGELOG.md"
+Security      = "https://github.com/roqueribeiro/more4cai/blob/main/SECURITY.md"
+
+[project.scripts]
+cai = "orchestrator.cli:app"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["orchestrator"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "ASYNC", "S"]
+ignore = ["S101", "S603", "S607"]  # assert OK em testes; subprocess com argv list é seguro
+
+[tool.mypy]
+python_version = "3.13"
+strict = true
+warn_return_any = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]

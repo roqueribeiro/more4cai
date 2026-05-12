@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>CAI — Relatório de Scan {{ scan_id[:8] }}</title>
+<style>
+  :root {
+    --critical: #b91c1c; --high: #dc2626; --medium: #d97706;
+    --low: #65a30d; --info: #6b7280; --bg: #0f172a; --fg: #e2e8f0;
+    --card: #1e293b; --border: #334155; --accent: #3b82f6;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, system-ui, Segoe UI, Roboto, sans-serif;
+         background: var(--bg); color: var(--fg); margin: 0; padding: 2rem;
+         line-height: 1.5; }
+  .container { max-width: 1200px; margin: 0 auto; }
+  header { border-bottom: 1px solid var(--border); padding-bottom: 1rem;
+           margin-bottom: 2rem; }
+  h1 { margin: 0; font-size: 1.75rem; }
+  .meta { color: #94a3b8; font-size: 0.9rem; margin-top: 0.5rem; }
+  .summary { display: flex; gap: 1rem; margin: 2rem 0; flex-wrap: wrap; }
+  .badge { padding: 0.75rem 1.25rem; border-radius: 8px; background: var(--card);
+           border: 1px solid var(--border); min-width: 110px; text-align: center; }
+  .badge .label { display: block; font-size: 0.75rem; text-transform: uppercase;
+                  color: #94a3b8; letter-spacing: 0.05em; }
+  .badge .count { display: block; font-size: 2rem; font-weight: 700; margin-top: 0.25rem; }
+  .badge.critical .count { color: var(--critical); }
+  .badge.high .count     { color: var(--high); }
+  .badge.medium .count   { color: var(--medium); }
+  .badge.low .count      { color: var(--low); }
+  .badge.info .count     { color: var(--info); }
+
+  .finding { background: var(--card); border: 1px solid var(--border);
+             border-radius: 10px; padding: 1.25rem; margin-bottom: 1rem; }
+  .finding header { display: flex; justify-content: space-between; align-items: start;
+                    border: none; padding: 0; margin-bottom: 0.75rem; gap: 1rem; }
+  .finding .title { font-weight: 600; font-size: 1.05rem; flex: 1; }
+  .pill { padding: 0.25rem 0.75rem; border-radius: 999px; font-size: 0.75rem;
+          font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; white-space: nowrap; }
+  .pill.critical { background: var(--critical); color: white; }
+  .pill.high     { background: var(--high); color: white; }
+  .pill.medium   { background: var(--medium); color: white; }
+  .pill.low      { background: var(--low); color: white; }
+  .pill.info     { background: var(--info); color: white; }
+  .pill.fp { background: #475569; color: #cbd5e1; margin-left: 0.5rem; }
+
+  .finding .target { color: #94a3b8; font-family: 'JetBrains Mono', Consolas, monospace;
+                     font-size: 0.85rem; }
+  .finding .description { margin: 0.75rem 0; }
+  .finding details { margin-top: 0.75rem; }
+  .finding summary { cursor: pointer; color: var(--accent); font-size: 0.9rem; }
+  .ai-triage { background: #0f172acc; border-left: 3px solid var(--accent);
+               padding: 0.75rem 1rem; margin: 0.75rem 0; border-radius: 4px; }
+  .ai-triage h4 { margin: 0 0 0.5rem 0; font-size: 0.9rem; color: var(--accent); }
+  .ai-triage .field { font-size: 0.9rem; margin-bottom: 0.4rem; }
+  .ai-triage .field strong { color: #cbd5e1; }
+  pre { background: #0f172a; padding: 0.75rem; border-radius: 4px;
+        overflow-x: auto; font-size: 0.8rem; max-height: 240px; }
+  .errors { background: #7f1d1d33; border: 1px solid #b91c1c; padding: 1rem;
+            border-radius: 8px; margin-bottom: 1rem; }
+  .empty { text-align: center; padding: 3rem; color: #94a3b8; }
+  footer { margin-top: 3rem; padding-top: 1rem; border-top: 1px solid var(--border);
+           color: #64748b; font-size: 0.8rem; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<header>
+  <h1>CAI — Relatório de Scan</h1>
+  <div class="meta">
+    Scan ID: <code>{{ scan_id }}</code> &middot;
+    Alvo: <code>{{ target.value }}</code> &middot;
+    Tipo: {{ target.asset_type }}
+  </div>
+</header>
+
+{% if errors %}
+<div class="errors">
+  <strong>Avisos durante a execução:</strong>
+  <ul>{% for e in errors %}<li>{{ e }}</li>{% endfor %}</ul>
+</div>
+{% endif %}
+
+<section class="summary">
+  <div class="badge critical"><span class="label">Critical</span><span class="count">{{ counts['critical'] }}</span></div>
+  <div class="badge high"><span class="label">High</span><span class="count">{{ counts['high'] }}</span></div>
+  <div class="badge medium"><span class="label">Medium</span><span class="count">{{ counts['medium'] }}</span></div>
+  <div class="badge low"><span class="label">Low</span><span class="count">{{ counts['low'] }}</span></div>
+  <div class="badge info"><span class="label">Info</span><span class="count">{{ counts['info'] }}</span></div>
+</section>
+
+{% if not findings %}
+<div class="empty">Nenhum finding registrado nesse scan.</div>
+{% else %}
+{% for f in findings %}
+{% set sev = effective_severity(f) %}
+<article class="finding">
+  <header>
+    <div class="title">
+      {{ f.title }}
+      {% if f.ai_triage and f.ai_triage.is_likely_false_positive %}
+        <span class="pill fp">provável falso positivo</span>
+      {% endif %}
+    </div>
+    <span class="pill {{ sev }}">{{ sev }}</span>
+  </header>
+  <div class="target">{{ f.source_tool }} · {{ f.target.value }}{% if f.vuln_id %} · {{ f.vuln_id }}{% endif %}{% if f.cwe %} · {{ f.cwe | join(', ') }}{% endif %}</div>
+  <div class="description">{{ f.description }}</div>
+
+  {% if f.ai_triage %}
+  <div class="ai-triage">
+    <h4>Triagem AI ({{ f.ai_triage.model_used }})</h4>
+    <div class="field"><strong>Justificativa:</strong> {{ f.ai_triage.rationale }}</div>
+    {% if f.ai_triage.business_impact %}
+    <div class="field"><strong>Impacto:</strong> {{ f.ai_triage.business_impact }}</div>
+    {% endif %}
+    {% if f.ai_triage.suggested_remediation %}
+    <div class="field"><strong>Remediação sugerida:</strong> {{ f.ai_triage.suggested_remediation }}</div>
+    {% endif %}
+    {% if f.ai_triage.owasp_top10 %}
+    <div class="field"><strong>OWASP:</strong> {{ f.ai_triage.owasp_top10 }}</div>
+    {% endif %}
+    {% if f.ai_triage.suggested_poc %}
+    <details><summary>PoC sugerida</summary><pre>{{ f.ai_triage.suggested_poc }}</pre></details>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {% if f.remediation %}
+  <details><summary>Remediação do scanner</summary><pre>{{ f.remediation }}</pre></details>
+  {% endif %}
+
+  {% if f.evidence %}
+  <details>
+    <summary>Evidências ({{ f.evidence | length }})</summary>
+    {% for ev in f.evidence %}
+    <div style="margin-top:0.5rem;">
+      <div>{{ ev.description }}</div>
+      {% if ev.snippet %}<pre>{{ ev.snippet }}</pre>{% endif %}
+      {% if ev.payload %}<div><strong>Payload:</strong> <code>{{ ev.payload }}</code></div>{% endif %}
+    </div>
+    {% endfor %}
+  </details>
+  {% endif %}
+</article>
+{% endfor %}
+{% endif %}
+
+<footer>
+  Gerado por CAI Orchestrator. Pipeline determinístico (Fase 1) · LLM triage habilitada quando configurada.
+</footer>
+
+</div>
+</body>
+</html>

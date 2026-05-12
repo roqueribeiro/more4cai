@@ -1,0 +1,22 @@
+# cai-expert — container com CAI framework instalado pra investigação agentic.
+# Opt-in via --profile ai-agent. Stub na Fase 4; completar integração quando
+# operar com cai-framework instalado.
+
+name: cai
+
+services:
+  cai-expert:
+    build:
+      context: ..
+      dockerfile: docker/images/cai-expert/Dockerfile
+    image: cai-expert:dev
+    container_name: cai-expert
+    env_file:
+      - ../.env
+    networks:
+      - cai-net
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    command: ["sleep", "infinity"]
+    profiles:
+      - ai-agent

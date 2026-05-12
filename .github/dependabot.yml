@@ -1,0 +1,31 @@
+version: 2
+updates:
+  - package-ecosystem: pip
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: "America/Sao_Paulo"
+    open-pull-requests-limit: 10
+    labels: ["dependencies", "python"]
+    groups:
+      runtime:
+        patterns: ["*"]
+        exclude-patterns: ["pytest*", "ruff", "mypy", "*pytest-*"]
+      dev:
+        patterns: ["pytest*", "ruff", "mypy", "*pytest-*"]
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    labels: ["dependencies", "ci"]
+
+  - package-ecosystem: docker
+    directory: "/docker/images/orchestrator"
+    schedule:
+      interval: weekly
+      day: monday
+    labels: ["dependencies", "docker"]

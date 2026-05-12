@@ -1,0 +1,35 @@
+# Configuração de scan OSINT/Exposure (Fase 2.5).
+# Copie para `config/exposure_targets.yml` e preencha com dados do banco.
+# NUNCA commitar o arquivo real (já está no .gitignore via padrão).
+
+company:
+  name: "Banco Exemplo S.A."
+  domains:
+    - "bancoexemplo.com.br"
+    - "be.com.br"
+
+  # Organizações GitHub conhecidas (oficiais ou suspeitas)
+  github_orgs:
+    - "bancoexemplo"
+    - "be-tech"
+
+  # Strings internas que NÃO deveriam aparecer em código público
+  internal_strings:
+    - "BE_INTERNAL_API"
+    - "be-prod-vault"
+    - "internal.bancoexemplo.com"
+
+  # CIDR de IPs do banco para Shodan/Censys
+  ip_ranges:
+    - "200.x.x.0/20"
+
+  # Query Shodan completa (override automático)
+  shodan_query: 'org:"Banco Exemplo S.A."'
+
+# Dorks customizados — combinados com domínios e strings acima
+dorks_template:
+  - "{domain} password"
+  - "{domain} api_key"
+  - "{domain} aws_secret"
+  - "{internal_string}"
+  - "{github_org} secret"

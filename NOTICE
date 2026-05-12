@@ -1,0 +1,49 @@
+CAI — Continuous AI Security
+Copyright 2024-2026 Roque Ribeiro and CAI contributors
+
+This product includes software developed at the CAI project
+(https://github.com/roqueribeiro/more4cai).
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+----------------------------------------------------------------------
+Third-Party Dependencies
+----------------------------------------------------------------------
+
+CAI builds on top of many open-source projects. See `pyproject.toml`
+for the authoritative dependency list. Notable runtime dependencies
+and their licenses:
+
+  - FastAPI                  (MIT)
+  - Pydantic / Pydantic-Settings (MIT)
+  - SQLModel / SQLAlchemy    (MIT)
+  - litellm                  (MIT)
+  - httpx                    (BSD-3-Clause)
+  - structlog                (Apache-2.0 / MIT)
+  - arq                      (MIT)
+  - Jinja2                   (BSD-3-Clause)
+  - Typer / Rich             (MIT)
+  - python-libnmap           (Apache-2.0)
+  - zaproxy (python client)  (Apache-2.0)
+  - PyGithub                 (LGPL-3.0)
+  - shodan                   (MIT)
+  - python-gvm               (GPL-3.0)
+  - authlib                  (BSD-3-Clause)
+
+Some optional integrations invoke external binaries (Nmap, Trivy,
+Nuclei, Gitleaks, Trufflehog, dnstwist, Checkov, kube-bench, ZAP,
+Greenbone) which are NOT redistributed by this project and remain
+under their respective upstream licenses.
+
+----------------------------------------------------------------------
+Lab Targets (NOT redistributed)
+----------------------------------------------------------------------
+
+The `lab` Docker Compose profile references intentionally vulnerable
+third-party applications (OWASP Juice Shop, DVWA, WebGoat). These
+images are pulled at runtime from their official registries and are
+not part of this distribution.

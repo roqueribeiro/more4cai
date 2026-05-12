@@ -1,0 +1,68 @@
+name: New scanner adapter
+description: Propose integration of a new security scanner.
+title: "[adapter] "
+labels: ["adapter", "enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Adapters follow the `ScannerAdapter` Protocol — see [`orchestrator/adapters/base.py`](../../orchestrator/adapters/base.py) and the [`cai-add-adapter`](../../.claude/skills/cai-add-adapter/SKILL.md) skill.
+
+  - type: input
+    id: scanner-name
+    attributes:
+      label: Scanner name
+      placeholder: Wapiti, Semgrep, Bandit, Wireshark, ...
+    validations:
+      required: true
+
+  - type: input
+    id: scanner-url
+    attributes:
+      label: Scanner upstream URL
+      placeholder: https://github.com/...
+    validations:
+      required: true
+
+  - type: input
+    id: license
+    attributes:
+      label: Scanner license
+      placeholder: GPL-3.0 / Apache-2.0 / MIT / commercial
+    validations:
+      required: true
+
+  - type: dropdown
+    id: invocation
+    attributes:
+      label: How does CAI invoke it?
+      options:
+        - Subprocess CLI (parse stdout/stderr/JSON file)
+        - HTTP API (daemon mode)
+        - Python library import
+        - SaaS API (auth required)
+    validations:
+      required: true
+
+  - type: textarea
+    id: output
+    attributes:
+      label: Output format and mapping to Finding
+      description: Describe how the raw output maps to CAI's canonical `Finding` (severity, CWE, OWASP, asset, evidence).
+    validations:
+      required: true
+
+  - type: textarea
+    id: requirements
+    attributes:
+      label: Runtime requirements
+      description: External binaries, container image, API keys, network egress.
+
+  - type: checkboxes
+    id: willing
+    attributes:
+      label: Are you willing to implement this?
+      options:
+        - label: I plan to open a PR.
+        - label: I can help review.
+        - label: I'm requesting it but cannot implement.

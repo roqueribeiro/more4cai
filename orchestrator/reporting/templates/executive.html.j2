@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>CAI — Relatório Executivo {{ scan_id[:8] }}</title>
+<style>
+  body { font-family: Georgia, serif; max-width: 900px; margin: 2rem auto; padding: 2rem;
+         color: #1f2937; line-height: 1.6; }
+  h1, h2, h3 { color: #1e3a8a; }
+  h1 { border-bottom: 3px solid #1e3a8a; padding-bottom: 0.5rem; }
+  h2 { margin-top: 2rem; border-bottom: 1px solid #cbd5e1; padding-bottom: 0.25rem; }
+  table { border-collapse: collapse; width: 100%; margin: 1rem 0; }
+  th, td { border: 1px solid #cbd5e1; padding: 0.5rem 0.75rem; text-align: left; }
+  th { background: #f1f5f9; font-weight: 600; }
+  .severity-critical { color: #b91c1c; font-weight: bold; }
+  .severity-high     { color: #dc2626; font-weight: bold; }
+  .severity-medium   { color: #d97706; }
+  .severity-low      { color: #65a30d; }
+  .severity-info     { color: #6b7280; }
+  .summary-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0.5rem;
+                  margin: 1rem 0; }
+  .summary-cell { text-align: center; padding: 1rem; border: 1px solid #cbd5e1;
+                  border-radius: 4px; }
+  .summary-cell .num { font-size: 2rem; font-weight: bold; }
+  .next-steps-box { background: #f8fafc; border-left: 4px solid #1e3a8a;
+                    padding: 1rem 1.5rem; margin: 1rem 0; }
+  footer { margin-top: 3rem; padding-top: 1rem; border-top: 1px solid #cbd5e1;
+           color: #6b7280; font-size: 0.85rem; }
+</style>
+</head>
+<body>
+
+<h1>Relatório Executivo de Segurança</h1>
+
+<p><strong>Scan ID:</strong> <code>{{ scan_id }}</code><br>
+<strong>Alvo:</strong> {{ target.value }} ({{ target.asset_type }})<br>
+<strong>Criticidade do ativo:</strong> {{ target.criticality }}<br>
+{% if target.contains_pii %}<strong>Dados sensíveis:</strong> ativo trata dados pessoais (PII)<br>{% endif %}
+</p>
+
+<h2>1. Sumário Executivo</h2>
+
+<div class="summary-grid">
+  <div class="summary-cell"><div class="num severity-critical">{{ counts['critical'] }}</div>Critical</div>
+  <div class="summary-cell"><div class="num severity-high">{{ counts['high'] }}</div>High</div>
+  <div class="summary-cell"><div class="num severity-medium">{{ counts['medium'] }}</div>Medium</div>
+  <div class="summary-cell"><div class="num severity-low">{{ counts['low'] }}</div>Low</div>
+  <div class="summary-cell"><div class="num severity-info">{{ counts['info'] }}</div>Info</div>
+</div>
+
+{% if executive_summary %}
+<p>{{ executive_summary }}</p>
+{% endif %}
+
+<h2>2. Achados Críticos e Altos</h2>
+
+{% set critical_high = findings | selectattr_severity(['critical', 'high'], effective_severity) | list %}
+{% if critical_high %}
+<table>
+<thead>
+<tr>
+  <th>Severidade</th>
+  <th>Título</th>
+  <th>OWASP</th>
+  <th>Ferramenta</th>
+  <th>Alvo</th>
+  <th>Impacto</th>
+</tr>
+</thead>
+<tbody>
+{% for f in critical_high %}
+{% set sev = effective_severity(f) %}
+<tr>
+  <td class="severity-{{ sev }}">{{ sev | upper }}</td>
+  <td>{{ f.title }}</td>
+  <td>{% if f.ai_triage and f.ai_triage.owasp_top10 %}{{ f.ai_triage.owasp_top10 }}{% else %}-{% endif %}</td>
+  <td>{{ f.source_tool }}</td>
+  <td>{{ f.target.value }}</td>
+  <td>{% if f.ai_triage %}{{ f.ai_triage.business_impact or '-' }}{% else %}-{% endif %}</td>
+</tr>
+{% endfor %}
+</tbody>
+</table>
+{% else %}
+<p><em>Nenhum achado crítico ou alto. Mantenha vigilância — ausência de high não significa ausência de risco.</em></p>
+{% endif %}
+
+<h2>3. Recomendações Prioritárias</h2>
+<ol>
+{% for rec in top_recommendations %}
+<li>{{ rec }}</li>
+{% endfor %}
+</ol>
+
+<h2>4. Próximos passos — handoff pra IA patcher</h2>
+
+<div class="next-steps-box">
+<p>Pra encadear correção automatizada com Claude Code, Cursor ou outra IA:</p>
+<pre><code>GET /reports/{{ scan_id }}/ai-bundle
+# ou
+cai bundle {{ scan_id }}</code></pre>
+<p>O bundle JSON inclui localização precisa, padrões de busca de código, exemplos before/after
+e instruções de re-verificação por finding.</p>
+</div>
+
+<h2>5. Referências</h2>
+<p>
+Operador: <strong>{{ actor or '(não informado)' }}</strong>.<br>
+Relatório técnico detalhado: <code>{{ technical_report_path }}</code>.
+</p>
+
+<footer>
+Relatório gerado automaticamente por CAI Orchestrator. Os achados aqui apresentados
+foram triados por IA e podem conter falsos positivos. Recomenda-se validação
+manual antes de qualquer ação corretiva.
+</footer>
+
+</body>
+</html>
