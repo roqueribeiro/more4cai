@@ -43,6 +43,7 @@ class SubdomainTakeoverAdapter:
         self.httpx = httpx_bin or shutil.which("httpx") or "httpx"
         self.nuclei = nuclei_bin or shutil.which("nuclei") or "nuclei"
         self._tasks: dict[str, asyncio.Task[Path]] = {}
+        self._workdirs: dict[str, Path] = {}
 
     async def health(self) -> bool:
         for b in (self.subfinder, self.httpx, self.nuclei):
@@ -119,10 +120,21 @@ class SubdomainTakeoverAdapter:
 
         native_id = str(uuid4())
         self._tasks[native_id] = asyncio.create_task(_run())
+        self._workdirs[native_id] = workdir
         return ScanHandle(
             adapter=self.name,
             native_id=native_id,
             metadata={"domain": target.value, "workdir": str(workdir)},
+        )
+
+    async def cleanup(self, handle: ScanHandle) -> None:
+        from orchestrator.adapters._cleanup import cleanup_subprocess_handle
+
+        await cleanup_subprocess_handle(
+            native_id=handle.native_id,
+            tasks=self._tasks,  # type: ignore[arg-type]
+            output_paths=self._workdirs,
+            adapter_name=self.name,
         )
 
     async def poll(self, handle: ScanHandle) -> ScanStatus:

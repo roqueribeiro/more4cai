@@ -7,6 +7,57 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `orchestrator.audit.log_audit_event` — append-only audit logging applied to
+  `POST /scans` and `POST /targets`. Backed by `audit_log` table reintroduced
+  by migration `0004_restore_audit_compliance`. In Postgres, UPDATE/DELETE on
+  `audit_log` are rejected by trigger.
+- `orchestrator.domain.target_validator.validate_target_value` — rejects
+  argv-injection attempts (values starting with `-`) and SSRF to private,
+  loopback, link-local, and IMDS networks when `LAB_ONLY=true`. Honors
+  `TARGET_ALLOWLIST` (hostname, IP, CIDR, or `*.domain`).
+- New settings: `LAB_ONLY` (default `true`), `TARGET_ALLOWLIST` (CSV or JSON
+  array, default empty), `REQUIRE_AUTH_REF` (default `false`). When enabled,
+  `REQUIRE_AUTH_REF` forces every `POST /scans` to include an
+  `authorization_ref` recorded in the audit log.
+- Optional `cleanup(handle)` method on all 9 subprocess scanner adapters.
+  Backed by `orchestrator.adapters._cleanup.cleanup_subprocess_handle`,
+  called automatically by the pipeline in a `finally` block to drain orphan
+  asyncio tasks and remove temp directories (H7 in the security audit).
+- Test suite expanded from 24 to 54 tests:
+  scrubber-in-triage coverage, `target_validator` H4/H5 cases, and
+  cleanup helper.
+
+### Changed
+- `orchestrator.ai.analyzer._finding_to_compact` now applies `scrub()` to
+  `title`, `description`, and `evidence_snippets` before any payload leaves
+  the orchestrator. Previously the scrubber lived in `reporting/exporters`
+  only, so AI triage received unredacted PII/PCI (C1 in the security audit;
+  LGPD Art. 46 / PCI DSS Req. 3).
+- `orchestrator.api.deps.require_token` uses `hmac.compare_digest` to mitigate
+  token timing attacks.
+- `orchestrator.api.routers.ui._ui_token` accepts `?token=` query parameter
+  only on `/ui/api/events` (SSE has no header support). All other UI endpoints
+  now require `X-API-Token` header to prevent token leakage via logs,
+  Referer, and browser cache.
+- `orchestrator.domain.scrubber._PHONE_BR` regex anchored with `(?<!\d)` /
+  `(?!\d)` boundaries to stop greedy matches inside long numeric tokens
+  (closes issue #6).
+- `orchestrator.adapters.greenbone_adapter` uses `defusedxml` instead of
+  `xml.etree.ElementTree` to mitigate XXE / billion-laughs in untrusted XML
+  (H6 in the security audit).
+- Bumped `litellm` from `>=1.55.0` to `>=1.70.0` (rate-limit / prompt-handling
+  fixes, addresses CVE backlog).
+- Bumped `authlib` from `>=1.3.2` to `>=1.7.0` (CVE-2024-37568 — OIDC
+  implicit grant).
+- Added `defusedxml>=0.7.1` runtime dependency.
+
+### Security
+- Closes C1, C2, H1, H4, H5, H6, H7 from the internal v0.1 security audit.
+- AI triage path is now PII/PCI-safe by default. Operators should re-validate
+  their custom `LLM_API_BASE` (e.g., LM Studio) but the scrubber runs
+  unconditionally regardless of provider.
+
 ## [0.1.0] - 2026-05-11
 
 ### Added

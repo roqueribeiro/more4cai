@@ -165,7 +165,7 @@ class GreenboneAdapter:
                     ignore_pagination=True,
                     details=True,
                 )
-                from xml.etree import ElementTree as ET
+                from defusedxml import ElementTree as ET
 
                 return ET.tostring(resp, encoding="unicode")
 
@@ -173,13 +173,17 @@ class GreenboneAdapter:
         return RawResults(adapter=self.name, payload=xml)
 
     async def normalize(self, raw: RawResults) -> list[Finding]:
-        from xml.etree import ElementTree as ET
+        # defusedxml previne XXE / billion-laughs em XML externo (Greenbone GMP).
+        # Mantemos a API ElementTree-compatible; defusedxml.fromstring rejeita
+        # DTD/entities por default.
+        from defusedxml import ElementTree as ET
+        from defusedxml.common import EntitiesForbidden, NotSupportedError
 
         findings: list[Finding] = []
         placeholder = uuid4()
         try:
             root = ET.fromstring(raw.payload)
-        except ET.ParseError as e:
+        except (ET.ParseError, EntitiesForbidden, NotSupportedError) as e:
             log.error("greenbone.parse_failed", error=str(e))
             return findings
 

@@ -100,6 +100,16 @@ class CheckovAdapter:
             return ScanStatus.FAILED
         return ScanStatus.DONE if task.done() else ScanStatus.RUNNING
 
+    async def cleanup(self, handle: ScanHandle) -> None:
+        from orchestrator.adapters._cleanup import cleanup_subprocess_handle
+
+        await cleanup_subprocess_handle(
+            native_id=handle.native_id,
+            tasks=self._tasks,  # type: ignore[arg-type]
+            output_paths=self._outs,
+            adapter_name=self.name,
+        )
+
     async def fetch_results(self, handle: ScanHandle) -> RawResults:
         path = self._outs.get(handle.native_id)
         data: Any = {}

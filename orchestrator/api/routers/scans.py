@@ -1,4 +1,10 @@
-"""Scans router — POST /scans dispara via arq, GET retorna status."""
+"""Scans router — POST /scans dispara via arq, GET retorna status.
+
+Compliance gates aplicados em `create_scan`:
+- `validate_target_value` (H4/H5): rejeita argv injection e SSRF.
+- `REQUIRE_AUTH_REF`: força `authorization_ref` quando ativo (default off em dev).
+- `log_audit_event`: registra `scan.create` no audit_log append-only.
+"""
 
 from __future__ import annotations
 
@@ -11,6 +17,12 @@ from pydantic import BaseModel, Field
 from sqlmodel import select
 
 from orchestrator.api.deps import SessionDep, TokenDep
+from orchestrator.audit import log_audit_event
+from orchestrator.config import settings
+from orchestrator.domain.target_validator import (
+    TargetValidationError,
+    validate_target_value,
+)
 from orchestrator.jobs.queue import _redis_settings
 from orchestrator.persistence.models import ScanRow, ScanState, TargetRow
 
@@ -23,6 +35,13 @@ class ScanIn(BaseModel):
     scanners: list[str] = Field(default_factory=lambda: ["nmap", "zap"])
     options: dict = Field(default_factory=dict)
     actor: str | None = None
+    authorization_ref: str | None = Field(
+        default=None,
+        description=(
+            "Referencia formal a autorizacao do scan (ticket, change, aprovacao "
+            "escrita). Exigido quando settings.REQUIRE_AUTH_REF=true."
+        ),
+    )
 
 
 class ScanOut(BaseModel):
@@ -30,6 +49,7 @@ class ScanOut(BaseModel):
     target_id: UUID
     state: str
     profile: str
+    authorization_ref: str | None
     started_at: datetime | None
     finished_at: datetime | None
     report_path: str | None
@@ -46,6 +66,22 @@ async def create_scan(
     if target is None:
         raise HTTPException(404, "target não encontrado")
 
+    # Gate 1: validar target.value contra injecao de flag e SSRF.
+    # Re-valida no momento do scan (target.value poderia ter sido inserido
+    # pre-allowlist em uma stack antiga sendo migrada).
+    try:
+        validate_target_value(target.value, asset_type=target.asset_type)
+    except TargetValidationError as e:
+        raise HTTPException(403, f"target rejeitado pela policy: {e}") from e
+
+    # Gate 2: authorization_ref obrigatorio quando ativo (prod regulado).
+    if settings.REQUIRE_AUTH_REF and not body.authorization_ref:
+        raise HTTPException(
+            403,
+            "authorization_ref e obrigatorio (REQUIRE_AUTH_REF=true). "
+            "Forneca o ticket/aprovacao formal do engagement.",
+        )
+
     scan = ScanRow(
         target_id=target.id,
         state=ScanState.PENDING.value,
@@ -53,8 +89,29 @@ async def create_scan(
         requested_scanners=body.scanners,
         options=body.options,
         actor=body.actor,
+        authorization_ref=body.authorization_ref,
     )
     session.add(scan)
+    await session.flush()  # garante scan.id antes do audit
+
+    # Gate 3: registra evento de auditoria no MESMO atomo da insercao.
+    await log_audit_event(
+        session,
+        action="scan.create",
+        actor=body.actor,
+        resource_type="scan",
+        resource_id=scan.id,
+        authorization_ref=body.authorization_ref,
+        request_body=body.model_dump(mode="json"),
+        metadata={
+            "target_value": target.value,
+            "target_asset_type": target.asset_type,
+            "profile": body.profile,
+            "scanners": body.scanners,
+            "lab_only": settings.LAB_ONLY,
+        },
+    )
+
     await session.commit()
     await session.refresh(scan)
 
@@ -103,6 +160,7 @@ def _to_out(s: ScanRow) -> ScanOut:
         target_id=s.target_id,
         state=s.state,
         profile=s.profile,
+        authorization_ref=s.authorization_ref,
         started_at=s.started_at,
         finished_at=s.finished_at,
         report_path=s.report_path,

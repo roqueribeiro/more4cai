@@ -14,6 +14,7 @@ import structlog
 from orchestrator.ai.gateway import complete_json
 from orchestrator.config import settings
 from orchestrator.domain.schemas import AITriage, Finding, Severity
+from orchestrator.domain.scrubber import scrub
 
 log = structlog.get_logger(__name__)
 
@@ -53,15 +54,22 @@ Regras:
 
 
 def _finding_to_compact(f: Finding) -> dict[str, Any]:
-    """Versão compacta do finding pro prompt — economiza tokens."""
+    """Versão compacta do finding pro prompt — economiza tokens.
+
+    Aplica `scrub()` em campos free-text (description, evidence) que tipicamente
+    carregam dados sensíveis vindos dos scanners (Bearer tokens em headers ZAP,
+    PAN em respostas Trivy, emails em achados Trufflehog/Gitleaks). target.value
+    pode ser uma URL real do escopo do engagement — preservamos. LGPD Art. 46
+    e PCI DSS Req. 3.
+    """
     return {
         "finding_id": str(f.id),
         "tool": f.source_tool,
         "rule_id": f.source_rule_id,
         "vuln_id": f.vuln_id,
         "cwe": f.cwe,
-        "title": f.title,
-        "description": f.description[:600],
+        "title": scrub(f.title),
+        "description": scrub(f.description[:600]),
         "severity": f.severity,
         "confidence": f.confidence,
         "target": {
@@ -70,7 +78,7 @@ def _finding_to_compact(f: Finding) -> dict[str, Any]:
             "criticality": f.target.criticality,
             "contains_pii": f.target.contains_pii,
         },
-        "evidence_snippets": [e.snippet or e.description[:200] for e in f.evidence[:3]],
+        "evidence_snippets": [scrub(e.snippet or e.description[:200]) for e in f.evidence[:3]],
     }
 
 

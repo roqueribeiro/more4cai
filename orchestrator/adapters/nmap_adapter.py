@@ -97,6 +97,17 @@ class NmapAdapter:
         xml = xml_path.read_text(encoding="utf-8")
         return RawResults(adapter=self.name, payload=xml)
 
+    async def cleanup(self, handle: ScanHandle) -> None:
+        """Cancela task pendente, drena excecao, remove temp dir."""
+        from orchestrator.adapters._cleanup import cleanup_subprocess_handle
+
+        await cleanup_subprocess_handle(
+            native_id=handle.native_id,
+            tasks=self._tasks,  # type: ignore[arg-type]
+            output_paths=self._xml_paths,
+            adapter_name=self.name,
+        )
+
     async def normalize(self, raw: RawResults) -> list[Finding]:
         from uuid import uuid4
 

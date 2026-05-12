@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -65,6 +66,15 @@ class Settings(BaseSettings):
     # API auth (token simples; pentester comercial num engagement)
     APP_TOKEN: str = "dev-changeme"  # token simples API; trocar em prod
 
+    # Compliance gates — defaults seguros (lab-only).
+    # Em prod regulado: LAB_ONLY=true + TARGET_ALLOWLIST=[escopo escrito do engagement]
+    # + REQUIRE_AUTH_REF=true (forca operador a referenciar ticket/aprovacao no scan).
+    LAB_ONLY: bool = True
+    # Armazenado como string (CSV ou JSON-array); acessar via `.target_allowlist`.
+    # Aceita: "juice-shop,dvwa,10.0.0.0/8" OU ["juice-shop","dvwa","10.0.0.0/8"]
+    TARGET_ALLOWLIST: str = ""
+    REQUIRE_AUTH_REF: bool = False
+
     # OIDC (Fase 6 stub)
     OIDC_ISSUER: str = ""
     OIDC_CLIENT_ID: str = ""
@@ -77,6 +87,24 @@ class Settings(BaseSettings):
 
     # Reports
     REPORTS_DIR: Path = Path("./reports")
+
+    @property
+    def target_allowlist(self) -> list[str]:
+        """Parseia TARGET_ALLOWLIST de string pra list. Aceita CSV ou JSON array.
+
+        Ambos validos:
+            TARGET_ALLOWLIST=juice-shop,dvwa,10.0.0.0/8
+            TARGET_ALLOWLIST=["juice-shop","dvwa","10.0.0.0/8"]
+        """
+        raw = self.TARGET_ALLOWLIST.strip()
+        if not raw:
+            return []
+        if raw.startswith("[") and raw.endswith("]"):
+            parsed = json.loads(raw)
+            if not isinstance(parsed, list):
+                raise ValueError("TARGET_ALLOWLIST JSON deve ser array")
+            return [str(x) for x in parsed]
+        return [x.strip() for x in raw.split(",") if x.strip()]
 
 
 settings = Settings()

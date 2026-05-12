@@ -48,6 +48,9 @@ class ScanRow(SQLModel, table=True):
     requested_scanners: list[str] = Field(default_factory=list, sa_type=JSON)
     options: dict[str, Any] = Field(default_factory=dict, sa_type=JSON)
     actor: str | None = None
+    # Referência formal à autorização (ticket, change, aprovação por escrito).
+    # Exigido quando settings.REQUIRE_AUTH_REF=true.
+    authorization_ref: str | None = Field(default=None, index=True)
     started_at: datetime | None = Field(default=None, sa_type=DateTime(timezone=True))
     finished_at: datetime | None = Field(default=None, sa_type=DateTime(timezone=True))
     errors: list[str] = Field(default_factory=list, sa_type=JSON)
@@ -57,6 +60,29 @@ class ScanRow(SQLModel, table=True):
     current_phase: str | None = Field(default=None, index=True)
     phase_progress: int | None = None  # 0-100 quando aplicável (ex: ZAP spider %)
     created_at: datetime = Field(default_factory=_utcnow, sa_type=DateTime(timezone=True))
+
+
+class AuditLogRow(SQLModel, table=True):
+    """Audit log append-only.
+
+    Em Postgres, UPDATE/DELETE são rejeitados pelo trigger `audit_log_no_update`
+    instalado pela migration 0004. Em SQLite (dev), o trigger não existe — o
+    contrato é mantido apenas no código (`orchestrator.audit.logger`).
+    """
+
+    __tablename__ = "audit_log"
+
+    id: UUID = Field(default_factory=uuid4, primary_key=True)
+    actor: str | None = Field(default=None, index=True)
+    action: str = Field(index=True)  # ex: "scan.create", "target.create"
+    resource_type: str | None = None  # ex: "scan", "target"
+    resource_id: UUID | None = Field(default=None, index=True)
+    authorization_ref: str | None = Field(default=None, index=True)
+    request_hash: str | None = None  # sha256 do body da requisição (sem PII)
+    metadata_json: dict[str, Any] = Field(default_factory=dict, sa_type=JSON)
+    created_at: datetime = Field(
+        default_factory=_utcnow, sa_type=DateTime(timezone=True), index=True
+    )
 
 
 class FindingRow(SQLModel, table=True):

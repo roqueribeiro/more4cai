@@ -118,6 +118,16 @@ class TrivyAdapter:
             return ScanStatus.RUNNING
         return ScanStatus.DONE if task.result() == 0 else ScanStatus.FAILED
 
+    async def cleanup(self, handle: ScanHandle) -> None:
+        from orchestrator.adapters._cleanup import cleanup_subprocess_handle
+
+        await cleanup_subprocess_handle(
+            native_id=handle.native_id,
+            tasks=self._tasks,  # type: ignore[arg-type]
+            output_paths=self._outputs,
+            adapter_name=self.name,
+        )
+
     async def fetch_results(self, handle: ScanHandle) -> RawResults:
         path = self._outputs.get(handle.native_id)
         if path is None or not path.exists():

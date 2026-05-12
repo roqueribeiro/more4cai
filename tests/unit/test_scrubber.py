@@ -2,6 +2,17 @@
 
 from __future__ import annotations
 
+from uuid import uuid4
+
+from orchestrator.ai.analyzer import _finding_to_compact
+from orchestrator.domain.schemas import (
+    AssetType,
+    Confidence,
+    Evidence,
+    Finding,
+    Severity,
+    Target,
+)
 from orchestrator.domain.scrubber import scrub, scrub_dict
 
 
@@ -67,6 +78,71 @@ def test_scrub_dict_recursive() -> None:
 
 def test_empty_string() -> None:
     assert scrub("") == ""
+
+
+def _make_finding(
+    *, description: str, title: str = "Test", evidence_snippet: str | None = None
+) -> Finding:
+    """Helper: cria Finding minimo pra testar _finding_to_compact."""
+    return Finding(
+        scan_id=uuid4(),
+        target=Target(asset_type=AssetType.URL, value="http://juice-shop:3000"),
+        source_tool="zap",
+        title=title,
+        description=description,
+        severity=Severity.HIGH,
+        confidence=Confidence.FIRM,
+        evidence=(
+            [Evidence(description="resp", snippet=evidence_snippet)]
+            if evidence_snippet is not None
+            else []
+        ),
+    )
+
+
+def test_triage_compact_scrubs_email_in_description() -> None:
+    f = _make_finding(description="Form leaked admin@bank.com.br in response body")
+    out = _finding_to_compact(f)
+    assert "admin@bank.com.br" not in out["description"]
+    assert "<EMAIL>" in out["description"]
+
+
+def test_triage_compact_scrubs_jwt_in_evidence_snippet() -> None:
+    jwt = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjMifQ.AAAA-BBBB_CCCC"
+    f = _make_finding(description="JWT exposto", evidence_snippet=f"Cookie: session={jwt}")
+    out = _finding_to_compact(f)
+    snippet = out["evidence_snippets"][0]
+    assert jwt not in snippet
+    assert "<JWT>" in snippet
+
+
+def test_triage_compact_scrubs_authorization_bearer() -> None:
+    f = _make_finding(
+        description="Endpoint aceita token estatico",
+        evidence_snippet="Authorization: Bearer abc123def456ghi789jkl012mno345pqr",
+    )
+    out = _finding_to_compact(f)
+    snippet = out["evidence_snippets"][0]
+    assert "abc123def456ghi789jkl012mno345pqr" not in snippet
+    assert "<REDACTED_TOKEN>" in snippet
+
+
+def test_triage_compact_scrubs_title() -> None:
+    # Scanners as vezes embutem PII no title (ex: "Email exposed: foo@bar.com")
+    f = _make_finding(
+        description="exposicao de email",
+        title="Email exposed: user@example.org in HTML comment",
+    )
+    out = _finding_to_compact(f)
+    assert "user@example.org" not in out["title"]
+    assert "<EMAIL>" in out["title"]
+
+
+def test_triage_compact_preserves_target_value() -> None:
+    # target.value e a URL real do engagement, NAO scrubbed (operador precisa rastrear)
+    f = _make_finding(description="x")
+    out = _finding_to_compact(f)
+    assert out["target"]["value"] == "http://juice-shop:3000"
 
 
 def test_no_match_returns_unchanged() -> None:

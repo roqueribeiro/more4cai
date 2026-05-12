@@ -38,9 +38,11 @@ _JWT: Final[Pattern[str]] = re.compile(r"\beyJ[a-zA-Z0-9_\-]+\.[a-zA-Z0-9_\-]+\.
 # AWS access key
 _AWS_KEY: Final[Pattern[str]] = re.compile(r"\b(AKIA|ASIA)[A-Z0-9]{16}\b")
 
-# Telefone BR: (11) 91234-5678 ou variações
+# Telefone BR: (11) 91234-5678 ou variações.
+# Bordas (?<!\d)/(?!\d) impedem que a regex devore digitos de tokens maiores
+# (ex: IDs de transacao de 14-16 digitos sendo recortados como telefone).
 _PHONE_BR: Final[Pattern[str]] = re.compile(
-    r"\(?(?:\+?55\s?)?(?:\(?[1-9][1-9]\)?\s?)?9?\d{4}[\-\s]?\d{4}\b"
+    r"(?<!\d)\(?(?:\+?55\s?)?(?:\(?[1-9][1-9]\)?\s?)?9?\d{4}[\-\s]?\d{4}(?!\d)"
 )
 
 # Bearer/Authorization tokens

@@ -121,6 +121,16 @@ class NucleiAdapter:
         # nuclei retorna 0 mesmo sem findings; só falha em erro real
         return ScanStatus.DONE if task.result() == 0 else ScanStatus.FAILED
 
+    async def cleanup(self, handle: ScanHandle) -> None:
+        from orchestrator.adapters._cleanup import cleanup_subprocess_handle
+
+        await cleanup_subprocess_handle(
+            native_id=handle.native_id,
+            tasks=self._tasks,  # type: ignore[arg-type]
+            output_paths=self._output_paths,
+            adapter_name=self.name,
+        )
+
     async def fetch_results(self, handle: ScanHandle) -> RawResults:
         path = self._output_paths.get(handle.native_id)
         lines: list[dict[str, Any]] = []

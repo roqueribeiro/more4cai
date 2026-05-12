@@ -47,7 +47,12 @@ async def _run_adapter(
     timeout: float = 1800.0,
     scan_id_str: str | None = None,
 ) -> list[Finding]:
-    """Lifecycle completo de um scan: start → poll → fetch → normalize."""
+    """Lifecycle completo de um scan: start → poll → fetch → normalize → cleanup.
+
+    Garante via `finally` que `adapter.cleanup(handle)` seja chamado, quando
+    o adapter expoe o metodo opcional. Previne vazamento de asyncio.Task,
+    diretorios temp, e excecoes nao-resgatadas (H7).
+    """
 
     if not await adapter.health():
         log.warning("adapter.unhealthy", adapter=adapter.name)
@@ -59,22 +64,35 @@ async def _run_adapter(
         return []
     log.info("scan.started", adapter=adapter.name, native_id=handle.native_id)
 
-    elapsed = 0.0
-    while elapsed < timeout:
-        status = await adapter.poll(handle)
-        if status == ScanStatus.DONE:
-            break
-        if status in (ScanStatus.FAILED, ScanStatus.CANCELED):
-            log.error("scan.failed", adapter=adapter.name, status=status)
+    try:
+        elapsed = 0.0
+        while elapsed < timeout:
+            status = await adapter.poll(handle)
+            if status == ScanStatus.DONE:
+                break
+            if status in (ScanStatus.FAILED, ScanStatus.CANCELED):
+                log.error("scan.failed", adapter=adapter.name, status=status)
+                return []
+            await asyncio.sleep(poll_every)
+            elapsed += poll_every
+        else:
+            log.error("scan.timeout", adapter=adapter.name, timeout=timeout)
             return []
-        await asyncio.sleep(poll_every)
-        elapsed += poll_every
-    else:
-        log.error("scan.timeout", adapter=adapter.name, timeout=timeout)
-        return []
 
-    raw = await adapter.fetch_results(handle)
-    return await adapter.normalize(raw)
+        raw = await adapter.fetch_results(handle)
+        return await adapter.normalize(raw)
+    finally:
+        cleanup = getattr(adapter, "cleanup", None)
+        if cleanup is not None:
+            try:
+                await cleanup(handle)
+            except Exception as e:  # noqa: BLE001
+                log.warning(
+                    "adapter.cleanup_failed",
+                    adapter=adapter.name,
+                    native_id=handle.native_id,
+                    error=str(e),
+                )
 
 
 async def run_scan(

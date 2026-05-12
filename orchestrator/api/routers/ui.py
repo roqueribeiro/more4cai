@@ -13,6 +13,7 @@ Auth: `X-API-Token` ou `?token=...` na query (UI mesmo origem).
 
 from __future__ import annotations
 
+import hmac
 import statistics
 from collections import Counter
 from typing import Annotated, Any
@@ -32,13 +33,26 @@ router = APIRouter(prefix="/ui/api", tags=["ui"])
 
 
 async def _ui_token(
+    request: Request,
     x_api_token: Annotated[str | None, Header(alias="X-API-Token")] = None,
     token: Annotated[str | None, Query()] = None,
 ) -> str:
-    """Auth UI: aceita header `X-API-Token` ou query `?token=...` (cookies seriam mais limpo,
-    mas requeriam OAuth fluxos — aqui mantemos simples e mesmo origem)."""
+    """Auth UI.
+
+    Aceita o header `X-API-Token` em qualquer endpoint. Aceita `?token=...` SOMENTE
+    em `/ui/api/events` — SSE não suporta headers customizados, então a query é
+    inevitável. Em todos os outros endpoints, o `?token=` é rejeitado pra evitar
+    que o token vaze em logs, Referer e cache de browser.
+
+    Compara com `hmac.compare_digest` pra mitigar timing attack.
+    """
+    if token is not None and not request.url.path.endswith("/events"):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="?token= permitido apenas em /ui/api/events; use X-API-Token header",
+        )
     provided = x_api_token or token
-    if not provided or provided != settings.APP_TOKEN:
+    if not provided or not hmac.compare_digest(provided, settings.APP_TOKEN):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="X-API-Token inválido",

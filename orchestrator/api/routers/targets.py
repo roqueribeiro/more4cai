@@ -9,7 +9,12 @@ from pydantic import BaseModel, Field
 from sqlmodel import select
 
 from orchestrator.api.deps import SessionDep, TokenDep
+from orchestrator.audit import log_audit_event
 from orchestrator.domain.schemas import AssetType, Severity
+from orchestrator.domain.target_validator import (
+    TargetValidationError,
+    validate_target_value,
+)
 from orchestrator.persistence.models import TargetRow
 
 router = APIRouter(prefix="/targets", tags=["targets"])
@@ -39,15 +44,34 @@ async def create_target(
     session: SessionDep,
     _token: TokenDep,
 ) -> TargetOut:
+    # Validacao de compliance: bloqueia argv injection e SSRF (H4/H5).
+    try:
+        normalized_value = validate_target_value(body.value, asset_type=body.asset_type.value)
+    except TargetValidationError as e:
+        raise HTTPException(403, f"target.value rejeitado: {e}") from e
+
     row = TargetRow(
         asset_type=body.asset_type.value,
-        value=body.value,
+        value=normalized_value,
         label=body.label,
         criticality=body.criticality.value,
         contains_pii=body.contains_pii,
         metadata_json=body.metadata,
     )
     session.add(row)
+    await session.flush()
+    await log_audit_event(
+        session,
+        action="target.create",
+        resource_type="target",
+        resource_id=row.id,
+        request_body=body.model_dump(mode="json"),
+        metadata={
+            "asset_type": body.asset_type.value,
+            "value": normalized_value,
+            "contains_pii": body.contains_pii,
+        },
+    )
     await session.commit()
     await session.refresh(row)
     return TargetOut(

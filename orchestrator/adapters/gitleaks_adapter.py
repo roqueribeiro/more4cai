@@ -118,6 +118,17 @@ class GitleaksAdapter:
         rc, _ = task.result()
         return ScanStatus.DONE if rc == 0 else ScanStatus.FAILED
 
+    async def cleanup(self, handle: ScanHandle) -> None:
+        """Cleanup gitleaks: cancela task + rmtree do workdir (contem clone + report)."""
+        from orchestrator.adapters._cleanup import cleanup_subprocess_handle
+
+        await cleanup_subprocess_handle(
+            native_id=handle.native_id,
+            tasks=self._tasks,  # type: ignore[arg-type]
+            output_paths=self._workdirs,  # workdir e' dir; helper detecta is_dir()
+            adapter_name=self.name,
+        )
+
     async def fetch_results(self, handle: ScanHandle) -> RawResults:
         _, report_path = self._tasks[handle.native_id].result()
         items: list[dict[str, Any]] = []
