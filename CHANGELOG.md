@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+
 - `orchestrator.audit.log_audit_event` — append-only audit logging applied to
   `POST /scans` and `POST /targets`. Backed by `audit_log` table reintroduced
   by migration `0004_restore_audit_compliance`. In Postgres, UPDATE/DELETE on
@@ -24,11 +25,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Backed by `orchestrator.adapters._cleanup.cleanup_subprocess_handle`,
   called automatically by the pipeline in a `finally` block to drain orphan
   asyncio tasks and remove temp directories (H7 in the security audit).
-- Test suite expanded from 24 to 54 tests:
-  scrubber-in-triage coverage, `target_validator` H4/H5 cases, and
-  cleanup helper.
+- `DELETE /scans/{id}` (204) — permanently removes a scan and its dependents
+  (`findings`, `ai_runs` via the `scan_id` FK). Audits `scan.delete` into the
+  append-only `audit_log` **before** deleting.
+- Test suite expanded from 24 to 56 tests:
+  scrubber-in-triage coverage, `target_validator` H4/H5 cases, the cleanup
+  helper, and a `run_scan` scan-id regression test.
 
 ### Changed
+
+- `run_scan` AI triage now runs on **every** finding (`skip_severities=set()`),
+  not just `medium+`. Hardened targets often yield only `info`/`low` findings;
+  skipping them meant the AI never ran ("connected a key but it isn't using
+  AI"). The AI triage is the value prop, so it always runs.
 - `orchestrator.ai.analyzer._finding_to_compact` now applies `scrub()` to
   `title`, `description`, and `evidence_snippets` before any payload leaves
   the orchestrator. Previously the scrubber lived in `reporting/exporters`
@@ -52,7 +61,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   implicit grant).
 - Added `defusedxml>=0.7.1` runtime dependency.
 
+### Fixed
+
+- `run_scan` now updates the `scan_id` it was given (created by `POST /scans`,
+  the id the UI/SSE watches) instead of minting a fresh `uuid4()`. Before, the
+  results landed under a different id and the requested scan stayed `pending`
+  forever in the UI. `_ensure_scan_row` upserts the existing row. Regression:
+  `tests/unit/test_pipeline_scan_id.py`.
+
 ### Security
+
 - Closes C1, C2, H1, H4, H5, H6, H7 from the internal v0.1 security audit.
 - AI triage path is now PII/PCI-safe by default. Operators should re-validate
   their custom `LLM_API_BASE` (e.g., LM Studio) but the scrubber runs
@@ -61,6 +79,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.1.0] - 2026-05-11
 
 ### Added
+
 - Initial public release of CAI (Continuous AI Security).
 - FastAPI orchestrator + arq worker queue + Postgres persistence + Redis broker.
 - 15 scanner adapters following the `ScannerAdapter` Protocol:
@@ -87,6 +106,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   via Typer (`cai`), structured logs via structlog.
 
 ### Security
+
 - LGPD-aware compliance gates: `LAB_ONLY`, `TARGET_ALLOWLIST`,
   `REQUIRE_AUTH_REF`, mandatory `authorization_ref` for active scans in
   production mode.
