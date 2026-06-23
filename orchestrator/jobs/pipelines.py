@@ -152,7 +152,11 @@ async def run_scan(
         await _update_phase(scan_id, "ai_triage")
         emit_phase(sid, "ai_triage")
         try:
-            await triage_batch(result.findings, scan_id=scan_id)
+            # Triage EVERY finding (skip_severities=set()) — hardened targets
+            # often yield only low/info findings, and skipping them meant the AI
+            # never ran at all ("connected a key but it's not using AI"). The AI
+            # is the whole value prop, so always exercise it.
+            await triage_batch(result.findings, scan_id=scan_id, skip_severities=set())
         except Exception as e:  # noqa: BLE001
             log.exception("ai.triage_failed", error=str(e))
             result.errors.append(f"ai_triage: {e}")

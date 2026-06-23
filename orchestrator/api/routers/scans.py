@@ -14,7 +14,7 @@ from uuid import UUID
 from arq import create_pool
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field
-from sqlmodel import select
+from sqlmodel import delete, select
 
 from orchestrator.api.deps import SessionDep, TokenDep
 from orchestrator.audit import log_audit_event
@@ -24,7 +24,7 @@ from orchestrator.domain.target_validator import (
     validate_target_value,
 )
 from orchestrator.jobs.queue import _redis_settings
-from orchestrator.persistence.models import ScanRow, ScanState, TargetRow
+from orchestrator.persistence.models import AIRun, FindingRow, ScanRow, ScanState, TargetRow
 
 router = APIRouter(prefix="/scans", tags=["scans"])
 
@@ -139,6 +139,32 @@ async def get_scan(scan_id: UUID, session: SessionDep, _token: TokenDep) -> Scan
     if scan is None:
         raise HTTPException(404, "scan não encontrado")
     return _to_out(scan)
+
+
+@router.delete("/{scan_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_scan(scan_id: UUID, session: SessionDep, _token: TokenDep) -> None:
+    """Apaga um scan e tudo que depende dele (findings + AI runs). Registra
+    `scan.delete` no audit_log append-only antes de remover."""
+    scan = await session.get(ScanRow, scan_id)
+    if scan is None:
+        raise HTTPException(404, "scan não encontrado")
+
+    # Audita ANTES de apagar (o audit_log é append-only e não referencia o scan
+    # por FK, então sobrevive à remoção).
+    await log_audit_event(
+        session,
+        action="scan.delete",
+        actor=None,
+        resource_type="scan",
+        resource_id=scan_id,
+        authorization_ref=None,
+        metadata={"target_id": str(scan.target_id), "state": scan.state},
+    )
+    # Remove dependentes primeiro (FK scan_id) e depois o scan.
+    await session.exec(delete(FindingRow).where(FindingRow.scan_id == scan_id))
+    await session.exec(delete(AIRun).where(AIRun.scan_id == scan_id))
+    await session.delete(scan)
+    await session.commit()
 
 
 @router.get("", response_model=list[ScanOut])
