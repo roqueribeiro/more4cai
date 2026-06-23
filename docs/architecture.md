@@ -71,7 +71,7 @@ class ScannerAdapter(Protocol):
 ### Domain (`orchestrator/domain/`)
 
 - **`schemas.py`** — Pydantic v2: `Finding`, `Target`, `AITriage`, `Severity`, `Confidence`, `AssetType`, etc. **Forma canônica** que todos os adapters produzem
-- **`scrubber.py`** — regex PII/PCI antes do LLM externo (CPF, CNPJ, PAN com Luhn, JWT, AWS keys, etc.)
+- **`scrubber.py`** — regex PII/PCI antes do LLM externo (CPF, CNPJ, PAN com Luhn, JWT, AWS keys, `Authorization: Bearer`, **`Cookie`/`Set-Cookie`** — segredos de scanning autenticado, etc.)
 - **`dedup.py`** — heurística (`deduped_key` = `sha256(target.value::rule_id)[:32]`) + semântica opcional via LLM
 
 **`deduped_key`** é determinístico — mesmo finding em runs diferentes tem mesma chave. Usado como base do `vulnerabilities[].id` no AI Fix Bundle (`uuid5(deduped_key)`) — patcher pode rastrear "o que já corrigi".
@@ -166,16 +166,16 @@ class AIRun:
 
 8 routers REST, todos com `X-API-Token`:
 
-| Router           | Endpoints                                                                                                                                                                                          |
-| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `targets.py`     | POST/GET `/targets`                                                                                                                                                                                |
-| `scans.py`       | POST `/scans` (arq enqueue), GET `/scans/{id}`, GET `/scans`, **DELETE `/scans/{id}`** (204; audita `scan.delete` e apaga findings + AI runs por FK)                                               |
-| `findings.py`    | GET `/findings` (filtros), GET `/findings/{id}`                                                                                                                                                    |
-| `reports.py`     | GET HTML técnico, **GET `/reports/{id}/executive`** (HTML executivo + compliance), **GET `/reports/{id}/compliance`** (JSON OWASP/PCI/LGPD), **GET `/reports/{id}/ai-bundle`** ⭐, POST DefectDojo |
-| `exposure.py`    | POST `/exposure/scan` (OSINT)                                                                                                                                                                      |
-| `investigate.py` | POST `/investigate/{finding_id}` (CAI agentic, HITL)                                                                                                                                               |
-| `health.py`      | **GET `/health/full`** ⭐ — agregador (Postgres/Redis/ZAP/LLM)                                                                                                                                     |
-| `ui.py`          | **`/ui/api/*`** ⭐ — endpoints do dashboard + SSE                                                                                                                                                  |
+| Router           | Endpoints                                                                                                                                                                                                                                                                                                                                                 |
+| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `targets.py`     | POST/GET `/targets`                                                                                                                                                                                                                                                                                                                                       |
+| `scans.py`       | POST `/scans` (arq enqueue; aceita `auth:{headers,openapi_url}` p/ **scanning autenticado** — `split_scan_auth()` mantém o segredo FORA da tabela `scans`, viaja como arg efêmero do job; `redact_audit_auth()` redige no audit), GET `/scans/{id}`, GET `/scans`, **DELETE `/scans/{id}`** (204; audita `scan.delete` e apaga findings + AI runs por FK) |
+| `findings.py`    | GET `/findings` (filtros), GET `/findings/{id}`                                                                                                                                                                                                                                                                                                           |
+| `reports.py`     | GET HTML técnico, **GET `/reports/{id}/executive`** (HTML executivo + compliance), **GET `/reports/{id}/compliance`** (JSON OWASP/PCI/LGPD), **GET `/reports/{id}/ai-bundle`** ⭐, POST DefectDojo                                                                                                                                                        |
+| `exposure.py`    | POST `/exposure/scan` (OSINT)                                                                                                                                                                                                                                                                                                                             |
+| `investigate.py` | POST `/investigate/{finding_id}` (CAI agentic, HITL)                                                                                                                                                                                                                                                                                                      |
+| `health.py`      | **GET `/health/full`** ⭐ — agregador (Postgres/Redis/ZAP/LLM)                                                                                                                                                                                                                                                                                            |
+| `ui.py`          | **`/ui/api/*`** ⭐ — endpoints do dashboard + SSE                                                                                                                                                                                                                                                                                                         |
 
 `/health` (sem auth) — liveness simples.
 
