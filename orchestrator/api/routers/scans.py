@@ -12,19 +12,24 @@ from datetime import datetime
 from uuid import UUID
 
 from arq import create_pool
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlmodel import delete, select
 
-from orchestrator.api.deps import SessionDep, TokenDep
+from orchestrator.api.deps import Principal, SessionDep, require_permission
 from orchestrator.audit import log_audit_event
 from orchestrator.config import settings
+from orchestrator.domain.roles import Permission
 from orchestrator.domain.target_validator import (
     TargetValidationError,
     validate_target_value,
 )
 from orchestrator.jobs.queue import _redis_settings
 from orchestrator.persistence.models import AIRun, FindingRow, ScanRow, ScanState, TargetRow
+
+# Gates de RBAC deste router.
+_RUN = Depends(require_permission(Permission.SCANS_RUN))
+_READ = Depends(require_permission(Permission.SCANS_READ))
 
 router = APIRouter(prefix="/scans", tags=["scans"])
 
@@ -60,7 +65,7 @@ class ScanOut(BaseModel):
 async def create_scan(
     body: ScanIn,
     session: SessionDep,
-    _token: TokenDep,
+    principal: Principal = _RUN,
 ) -> ScanOut:
     target = await session.get(TargetRow, body.target_id)
     if target is None:
@@ -88,7 +93,7 @@ async def create_scan(
         profile=body.profile,
         requested_scanners=body.scanners,
         options=body.options,
-        actor=body.actor,
+        actor=principal.email,
         authorization_ref=body.authorization_ref,
     )
     session.add(scan)
@@ -98,7 +103,7 @@ async def create_scan(
     await log_audit_event(
         session,
         action="scan.create",
-        actor=body.actor,
+        actor=principal.email,
         resource_type="scan",
         resource_id=scan.id,
         authorization_ref=body.authorization_ref,
@@ -125,7 +130,7 @@ async def create_scan(
         contains_pii=target.contains_pii,
         scanners=body.scanners,
         options=body.options,
-        actor=body.actor,
+        actor=principal.email,
         scan_id=str(scan.id),
         _job_id=f"scan-{scan.id}",
     )
@@ -134,7 +139,9 @@ async def create_scan(
 
 
 @router.get("/{scan_id}", response_model=ScanOut)
-async def get_scan(scan_id: UUID, session: SessionDep, _token: TokenDep) -> ScanOut:
+async def get_scan(
+    scan_id: UUID, session: SessionDep, _principal: Principal = _READ
+) -> ScanOut:
     scan = await session.get(ScanRow, scan_id)
     if scan is None:
         raise HTTPException(404, "scan não encontrado")
@@ -142,7 +149,9 @@ async def get_scan(scan_id: UUID, session: SessionDep, _token: TokenDep) -> Scan
 
 
 @router.delete("/{scan_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_scan(scan_id: UUID, session: SessionDep, _token: TokenDep) -> None:
+async def delete_scan(
+    scan_id: UUID, session: SessionDep, principal: Principal = _RUN
+) -> None:
     """Apaga um scan e tudo que depende dele (findings + AI runs). Registra
     `scan.delete` no audit_log append-only antes de remover."""
     scan = await session.get(ScanRow, scan_id)
@@ -154,7 +163,7 @@ async def delete_scan(scan_id: UUID, session: SessionDep, _token: TokenDep) -> N
     await log_audit_event(
         session,
         action="scan.delete",
-        actor=None,
+        actor=principal.email,
         resource_type="scan",
         resource_id=scan_id,
         authorization_ref=None,
@@ -170,8 +179,8 @@ async def delete_scan(scan_id: UUID, session: SessionDep, _token: TokenDep) -> N
 @router.get("", response_model=list[ScanOut])
 async def list_scans(
     session: SessionDep,
-    _token: TokenDep,
     state: str | None = None,
+    _principal: Principal = _READ,
 ) -> list[ScanOut]:
     stmt = select(ScanRow).order_by(ScanRow.created_at.desc()).limit(100)
     if state:

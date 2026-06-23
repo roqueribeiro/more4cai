@@ -315,9 +315,10 @@ Stream SSE de todo log do orchestrator. Filtrável por `event`/`level`/qualquer 
 - **Referência de autorização** — `REQUIRE_AUTH_REF=true` exige `authorization_ref` (ticket/aprovação) em todo scan; o valor entra no `audit_log` (rastreabilidade do engagement).
 - **PII/PCI scrubber** — `orchestrator/domain/scrubber.py`: redação de CPF, CNPJ, PAN (com Luhn), JWT, chaves AWS, telefone BR **antes** de qualquer LLM externo. O **AI Fix Bundle também passa pelo scrubber** antes de ser servido (snippets de request/response não vazam credencial no entregável).
 - **Soberania de dados (LGPD by design)** — com `LLM_API_BASE` (LM Studio/Ollama) os findings **nunca saem da infra do cliente**: triagem por IA 100% on-prem. O scrubber é a 2ª linha de defesa quando um LLM cloud é usado.
-- **AuthN** — `X-API-Token` (header `X-API-Token`, comparação timing-safe via `hmac.compare_digest` em `orchestrator/api/deps.py`). Na camada RoqueOS, o token é gerado e guardado **criptografado (AES)** pelo `roqueos-server` e o browser nunca o vê (ver §Integração RoqueOS).
+- **AuthN — identidade + RBAC** (`orchestrator/api/deps.py` + `orchestrator/domain/roles.py`): dois caminhos no header `X-API-Token` — (1) **token de serviço** (`APP_TOKEN`, comparação timing-safe via `hmac.compare_digest`, sem hit no DB) que mapeia para um `Principal` de serviço **ADMIN** (é o que a integração RoqueShield injeta — backward-compatible); (2) **token por-usuário** (`UserRow`, hash SHA-256, token em claro mostrado uma vez) que resolve para a identidade real (id/email) + o papel do usuário. Na camada RoqueOS, o token de serviço é guardado **criptografado (AES)** pelo `roqueos-server` e o browser nunca o vê (ver §Integração RoqueOS).
+- **RBAC — papéis + permissões** (`orchestrator/domain/roles.py`): 4 papéis (`admin`/`operator`/`auditor`/`viewer`) × permissões granulares (`users:manage`, `scans:run`, `scans:read`, `audit:read`, `config:manage`), com **segregação de funções** (operator dispara mas não lê o audit; auditor lê tudo + audit mas não dispara). Gate `require_permission(perm)` aplicado em todos os routers de scans/targets/findings/reports/exposure + o router admin `/users`. O `actor` do `audit_log` agora é a **identidade autenticada** (email do usuário ou `service@local`), não mais string livre.
 
-**Lacuna consciente (roadmap de identidade):** o auth do orchestrator é hoje um **token único compartilhado** — o próprio `deps.py` documenta o destino: _"Fase 5+ vira RBAC; Fase 6+ vira OIDC"_ (há scaffolding `OIDC_*` no `.env.example`). Para uso enterprise multi-usuário é necessário: usuários nomeados + RBAC (admin/operator/auditor/viewer), SSO **OIDC/SAML**, multi-tenancy (isolamento por org/projeto) e o `actor` do `audit_log` amarrado a uma identidade real (hoje é string livre). Esse é o **P0 #1** do roadmap de produto.
+**Lacuna consciente (roadmap de identidade):** RBAC + usuários nomeados + tokens por-usuário estão **construídos e testados** (migration `0005_add_users`, 14 testes em `tests/unit/test_rbac.py` + `test_auth_principal.py`). Falta a **Fase 6 — SSO OIDC/SAML** (scaffolding `OIDC_*` no `.env.example` + `authlib` já é dependência; falta o flow de login/callback/sessão) e **multi-tenancy** (isolamento por org/projeto). Esses são os próximos P0 do roadmap de produto.
 
 ---
 
@@ -350,7 +351,7 @@ stack more4cai: orchestrator + worker + postgres + redis + zap + trivy  (+ green
 
 ## Limitações conhecidas
 
-- **Identidade:** token único compartilhado — sem RBAC/SSO/multi-tenancy (ver §Segurança & Compliance, P0 #1 do roadmap).
+- **Identidade:** RBAC + usuários nomeados + tokens por-usuário **construídos** (migration 0005); falta **SSO OIDC/SAML** (Fase 6) e **multi-tenancy** (isolamento por org/projeto) — ver §Segurança & Compliance.
 - **Scanning não-autenticado:** ZAP/Nuclei testam só a superfície exposta; falta scan **credenciado/autenticado** (sessão/cookie/bearer, import OpenAPI/Postman) — o maior gap pra app de banco (risco atrás do login).
 - **One-shot:** sem agendamento/scan contínuo nem diff entre execuções (só correlação intra-scan via `dedup`).
 - **Escala:** docker-compose single-host, adapters em sequência no pipeline — sem scan distribuído/horizontal.

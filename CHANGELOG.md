@@ -9,6 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Identity & RBAC** — named users + roles + per-user API tokens.
+  - `orchestrator.domain.roles` — `Role` (admin/operator/auditor/viewer) +
+    granular `Permission` (`users:manage`, `scans:run`, `scans:read`,
+    `audit:read`, `config:manage`) + the role→permission map. Segregation of
+    duties: operator runs scans but can't read the audit log; auditor reads
+    everything + the audit log but can't run scans.
+  - `UserRow` (`users` table, migration `0005_add_users`) — email, role,
+    SHA-256 of a per-user token (the plaintext token is shown only once),
+    `idp_subject` reserved for OIDC.
+  - `orchestrator.api.deps` rewritten to a `Principal`-based model:
+    `get_principal` resolves `X-API-Token` to either a **service principal**
+    (the global `APP_TOKEN` → ADMIN, no DB hit — keeps the RoqueShield
+    integration working unchanged) or a **named user**. `require_permission()`
+    gate enforced on scans/targets/findings/reports/exposure + `/users`. The
+    `audit_log` `actor` is now the authenticated identity, not a free string.
+  - `/users` router (admin-only): create, list, set-role, deactivate,
+    rotate-token. 14 new tests (`tests/unit/test_rbac.py`,
+    `tests/unit/test_auth_principal.py`); 70 unit tests total.
 - `orchestrator.audit.log_audit_event` — append-only audit logging applied to
   `POST /scans` and `POST /targets`. Backed by `audit_log` table reintroduced
   by migration `0004_restore_audit_compliance`. In Postgres, UPDATE/DELETE on

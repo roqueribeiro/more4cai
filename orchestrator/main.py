@@ -43,6 +43,9 @@ from orchestrator.api.routers import (
 from orchestrator.api.routers import (
     ui as ui_router,
 )
+from orchestrator.api.routers import (
+    users as users_router,
+)
 from orchestrator.config import settings
 
 
@@ -104,6 +107,7 @@ app.include_router(exposure_router.router)
 app.include_router(investigate_router.router)
 app.include_router(health_router.router)  # /health/full
 app.include_router(ui_router.router)  # /ui/api/*
+app.include_router(users_router.router)  # /users (admin-only, RBAC)
 
 # Static files servindo o dashboard em /ui
 _STATIC_DIR = Path(__file__).parent / "static"

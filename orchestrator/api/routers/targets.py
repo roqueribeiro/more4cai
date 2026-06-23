@@ -8,7 +8,12 @@ from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlmodel import select
 
-from orchestrator.api.deps import SessionDep, TokenDep
+from orchestrator.api.deps import (
+    Principal,
+    RequireScansRead,
+    RequireScansRun,
+    SessionDep,
+)
 from orchestrator.audit import log_audit_event
 from orchestrator.domain.schemas import AssetType, Severity
 from orchestrator.domain.target_validator import (
@@ -42,7 +47,7 @@ class TargetOut(BaseModel):
 async def create_target(
     body: TargetIn,
     session: SessionDep,
-    _token: TokenDep,
+    principal: Principal = RequireScansRun,
 ) -> TargetOut:
     # Validacao de compliance: bloqueia argv injection e SSRF (H4/H5).
     try:
@@ -63,6 +68,7 @@ async def create_target(
     await log_audit_event(
         session,
         action="target.create",
+        actor=principal.email,
         resource_type="target",
         resource_id=row.id,
         request_body=body.model_dump(mode="json"),
@@ -85,7 +91,9 @@ async def create_target(
 
 
 @router.get("", response_model=list[TargetOut])
-async def list_targets(session: SessionDep, _token: TokenDep) -> list[TargetOut]:
+async def list_targets(
+    session: SessionDep, _principal: Principal = RequireScansRead
+) -> list[TargetOut]:
     rows = (await session.exec(select(TargetRow))).all()
     return [
         TargetOut(
@@ -101,7 +109,9 @@ async def list_targets(session: SessionDep, _token: TokenDep) -> list[TargetOut]
 
 
 @router.get("/{target_id}", response_model=TargetOut)
-async def get_target(target_id: UUID, session: SessionDep, _token: TokenDep) -> TargetOut:
+async def get_target(
+    target_id: UUID, session: SessionDep, _principal: Principal = RequireScansRead
+) -> TargetOut:
     row = await session.get(TargetRow, target_id)
     if row is None:
         raise HTTPException(404, "target não encontrado")

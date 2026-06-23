@@ -9,7 +9,7 @@ from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 from sqlmodel import select
 
-from orchestrator.api.deps import SessionDep, TokenDep
+from orchestrator.api.deps import Principal, RequireScansRead, SessionDep
 from orchestrator.persistence.models import FindingRow
 
 router = APIRouter(prefix="/findings", tags=["findings"])
@@ -31,11 +31,11 @@ class FindingOut(BaseModel):
 @router.get("", response_model=list[FindingOut])
 async def list_findings(
     session: SessionDep,
-    _token: TokenDep,
     scan_id: UUID | None = None,
     severity: str | None = None,
     source_tool: str | None = None,
     limit: int = Query(default=100, le=500),
+    _principal: Principal = RequireScansRead,
 ) -> list[FindingOut]:
     stmt = select(FindingRow).order_by(FindingRow.discovered_at.desc()).limit(limit)
     if scan_id:
@@ -50,7 +50,9 @@ async def list_findings(
 
 
 @router.get("/{finding_id}", response_model=FindingOut)
-async def get_finding(finding_id: UUID, session: SessionDep, _token: TokenDep) -> FindingOut:
+async def get_finding(
+    finding_id: UUID, session: SessionDep, _principal: Principal = RequireScansRead
+) -> FindingOut:
     row = await session.get(FindingRow, finding_id)
     if row is None:
         raise HTTPException(404, "finding não encontrado")

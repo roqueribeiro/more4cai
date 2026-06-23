@@ -102,6 +102,29 @@ class FindingRow(SQLModel, table=True):
     discovered_at: datetime = Field(default_factory=_utcnow, sa_type=DateTime(timezone=True))
 
 
+class UserRow(SQLModel, table=True):
+    """Usuário nomeado + papel (RBAC).
+
+    Auth por **token por-usuário** (hash SHA-256 — o token em claro só aparece
+    UMA vez, na criação/rotação). `idp_subject` reservado pro login OIDC/SSO
+    (Fase 6). O `APP_TOKEN` global continua válido como principal de serviço
+    (admin) — ver `orchestrator.api.deps`.
+    """
+
+    __tablename__ = "users"
+
+    id: UUID = Field(default_factory=uuid4, primary_key=True)
+    email: str = Field(index=True, unique=True)
+    name: str | None = None
+    role: str = Field(default="viewer", index=True)  # admin|operator|auditor|viewer
+    # SHA-256 do token por-usuário (nunca guardamos o token em claro).
+    api_token_hash: str | None = Field(default=None, index=True, unique=True)
+    idp_subject: str | None = Field(default=None, index=True)  # OIDC `sub` (Fase 6)
+    active: bool = Field(default=True, index=True)
+    created_at: datetime = Field(default_factory=_utcnow, sa_type=DateTime(timezone=True))
+    last_login_at: datetime | None = Field(default=None, sa_type=DateTime(timezone=True))
+
+
 class AIRun(SQLModel, table=True):
     """Telemetria de cada chamada LLM — custo, latência, tokens, cache hit."""
 
