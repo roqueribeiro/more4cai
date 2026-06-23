@@ -92,9 +92,13 @@ def render_executive(
 ) -> Path:
     """Relatório executivo HTML — sumário pra stakeholders do engagement."""
 
+    from orchestrator.reporting.compliance import build_compliance_report
+
     counts = {sev.value: 0 for sev in Severity}
     for f in result.findings:
         counts[_effective_severity(f)] += 1
+
+    compliance = build_compliance_report(result.findings)
 
     template = _env.get_template("executive.html.j2")
     html = template.render(
@@ -102,6 +106,7 @@ def render_executive(
         target=result.target,
         findings=result.findings,
         counts=counts,
+        compliance=compliance,
         executive_summary=executive_summary,
         top_recommendations=list(top_recommendations or []),
         actor=actor,

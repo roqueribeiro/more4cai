@@ -103,6 +103,7 @@ async def build_bundle(scan_id: UUID) -> dict[str, Any]:
         },
         "target": _target_section(target),
         "summary": _summary(vulnerabilities),
+        "compliance": _compliance_section(rows),
         "vulnerabilities": vulnerabilities,
         "appendix": {
             "raw_scan_artifacts": [
@@ -131,6 +132,31 @@ async def build_bundle(scan_id: UUID) -> dict[str, Any]:
 
     log.info("bundle.build_done", scan_id=str(scan_id), vulns=len(vulnerabilities))
     return bundle
+
+
+def _compliance_section(rows: list[FindingRow]) -> dict[str, Any]:
+    """Agrega compliance (OWASP/PCI/LGPD/CWE-Top25 + nota de postura A–F)
+    reconstruindo as findings a partir do payload persistido. O AI patcher (e o
+    GRC do cliente) recebe os frameworks junto do bundle."""
+    from orchestrator.domain.schemas import Finding
+    from orchestrator.reporting.compliance import build_compliance_report
+
+    findings = []
+    for r in rows:
+        try:
+            findings.append(Finding.model_validate(r.payload))
+        except Exception:  # noqa: BLE001, S112
+            continue
+    rep = build_compliance_report(findings)
+    return {
+        "risk_grade": rep.risk_grade,
+        "risk_index": rep.risk_index,
+        "max_cvss": rep.max_cvss,
+        "owasp_top10_2021": rep.owasp_coverage,
+        "pci_dss_4_0": rep.pci_dss_coverage,
+        "lgpd": rep.lgpd_coverage,
+        "cwe_top25_2023": list(rep.cwe_top25_unique),
+    }
 
 
 def _detect_model_used(rows: list[FindingRow]) -> str | None:

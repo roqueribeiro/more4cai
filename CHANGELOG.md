@@ -9,6 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Compliance & executive reporting** (`orchestrator/reporting/compliance.py`).
+  - Deterministic mapping engine: every `Finding` →
+    OWASP Top 10 2021 (CWE-derived, or the AI-triage `owasp_top10` when present)
+    → PCI DSS 4.0 requirements + LGPD articles (Lei 13.709/2018), plus the
+    CWE Top 25 (2023) flag and a CVSS base (real `cvss_v3.score` or a
+    severity band). `build_compliance_report()` aggregates per-framework
+    coverage + a risk-posture **grade A–F** (never better than D with an open
+    critical) + the top risks ranked by CVSS.
+  - `GET /reports/{scan_id}/executive` — on-demand executive HTML with the
+    risk-posture badge, the OWASP→PCI→LGPD coverage tables, CWE-Top-25 hits,
+    and a critical/high table carrying CVSS + PCI per finding. (The
+    `render_executive` template existed but had no endpoint and no compliance
+    section.)
+  - `GET /reports/{scan_id}/compliance` — the same mapping as machine-readable
+    JSON (frameworks + per-finding) for the client's GRC/SIEM/audit pipeline.
+  - The AI Fix Bundle now carries a `compliance` block (risk grade + framework
+    coverage) alongside the per-vulnerability classification.
+  - 14 new tests (`tests/unit/test_compliance.py`); 95 unit tests total.
 - **Identity & RBAC** — named users + roles + per-user API tokens.
   - `orchestrator.domain.roles` — `Role` (admin/operator/auditor/viewer) +
     granular `Permission` (`users:manage`, `scans:run`, `scans:read`,

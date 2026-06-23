@@ -26,6 +26,23 @@
                     padding: 1rem 1.5rem; margin: 1rem 0; }
   footer { margin-top: 3rem; padding-top: 1rem; border-top: 1px solid #cbd5e1;
            color: #6b7280; font-size: 0.85rem; }
+  .posture { display: flex; align-items: center; gap: 1.5rem; margin: 1rem 0;
+             padding: 1rem 1.5rem; border: 1px solid #cbd5e1; border-radius: 6px;
+             background: #f8fafc; }
+  .grade { font-size: 3.5rem; font-weight: 800; line-height: 1; width: 5rem;
+           height: 5rem; display: flex; align-items: center; justify-content: center;
+           border-radius: 8px; color: #fff; }
+  .grade-A { background: #16a34a; } .grade-B { background: #65a30d; }
+  .grade-C { background: #d97706; } .grade-D { background: #ea580c; }
+  .grade-E { background: #dc2626; } .grade-F { background: #7f1d1d; }
+  .posture .meta { font-size: 0.95rem; }
+  .posture .meta b { font-size: 1.15rem; }
+  .fw-tables { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+  .fw-tables table { margin: 0.25rem 0; }
+  .pill { display: inline-block; padding: 0.1rem 0.5rem; border-radius: 999px;
+          background: #e0e7ff; color: #3730a3; font-size: 0.8rem; font-weight: 600; }
+  @media (max-width: 640px) { .fw-tables { grid-template-columns: 1fr; }
+                              .summary-grid { grid-template-columns: repeat(3, 1fr); } }
 </style>
 </head>
 <body>
@@ -52,7 +69,59 @@
 <p>{{ executive_summary }}</p>
 {% endif %}
 
-<h2>2. Achados Críticos e Altos</h2>
+{% if compliance %}
+<div class="posture">
+  <div class="grade grade-{{ compliance.risk_grade }}">{{ compliance.risk_grade }}</div>
+  <div class="meta">
+    <div>Postura de risco: <b>nota {{ compliance.risk_grade }}</b> (índice {{ compliance.risk_index }}/100)</div>
+    <div>Maior CVSS observado: <b>{{ '%.1f' | format(compliance.max_cvss) }}</b>
+         &middot; achados no CWE Top 25 (2023): <b>{{ compliance.cwe_top25_hits }}</b></div>
+    <div>Total de achados: <b>{{ compliance.total_findings }}</b></div>
+  </div>
+</div>
+
+<h2>2. Mapeamento de Compliance</h2>
+<p>Cada achado é classificado em OWASP Top 10 2021, e daí derivado para PCI DSS 4.0 e LGPD.
+   As tabelas mostram a cobertura (quantos achados tocam cada item).</p>
+
+<div class="fw-tables">
+  <div>
+    <h3>OWASP Top 10 (2021)</h3>
+    {% if compliance.owasp_coverage %}
+    <table><thead><tr><th>Categoria</th><th>Achados</th></tr></thead><tbody>
+    {% for cat, n in compliance.owasp_coverage.items() %}
+      <tr><td>{{ cat }}</td><td>{{ n }}</td></tr>
+    {% endfor %}
+    </tbody></table>
+    {% else %}<p><em>Nenhum achado classificado em OWASP.</em></p>{% endif %}
+  </div>
+  <div>
+    <h3>PCI DSS 4.0</h3>
+    {% if compliance.pci_dss_coverage %}
+    <table><thead><tr><th>Requisito</th><th>Achados</th></tr></thead><tbody>
+    {% for req, n in compliance.pci_dss_coverage.items() %}
+      <tr><td>Req. {{ req }}</td><td>{{ n }}</td></tr>
+    {% endfor %}
+    </tbody></table>
+    {% else %}<p><em>Nenhum requisito PCI tocado.</em></p>{% endif %}
+  </div>
+</div>
+
+{% if compliance.lgpd_coverage %}
+<h3>LGPD (Lei 13.709/2018)</h3>
+<p>Achados que impactam a proteção de dados pessoais:
+  {% for art, n in compliance.lgpd_coverage.items() %}<span class="pill">{{ art }} ({{ n }})</span> {% endfor %}
+</p>
+{% endif %}
+
+{% if compliance.cwe_top25_unique %}
+<p><strong>CWE Top 25 mais perigosos (2023) presentes:</strong>
+  {% for cwe in compliance.cwe_top25_unique %}<span class="pill">{{ cwe }}</span> {% endfor %}
+</p>
+{% endif %}
+{% endif %}
+
+<h2>3. Achados Críticos e Altos</h2>
 
 {% set critical_high = findings | selectattr_severity(['critical', 'high'], effective_severity) | list %}
 {% if critical_high %}
@@ -60,23 +129,26 @@
 <thead>
 <tr>
   <th>Severidade</th>
+  <th>CVSS</th>
   <th>Título</th>
   <th>OWASP</th>
+  <th>PCI DSS</th>
   <th>Ferramenta</th>
   <th>Alvo</th>
-  <th>Impacto</th>
 </tr>
 </thead>
 <tbody>
 {% for f in critical_high %}
 {% set sev = effective_severity(f) %}
+{% set fc = compliance.per_finding[f.id | string] if compliance else None %}
 <tr>
   <td class="severity-{{ sev }}">{{ sev | upper }}</td>
+  <td>{% if fc %}{{ '%.1f' | format(fc.cvss) }}{% else %}-{% endif %}</td>
   <td>{{ f.title }}</td>
-  <td>{% if f.ai_triage and f.ai_triage.owasp_top10 %}{{ f.ai_triage.owasp_top10 }}{% else %}-{% endif %}</td>
+  <td>{% if fc and fc.owasp_2021 %}{{ fc.owasp_2021.split('-')[0] }}{% elif f.ai_triage and f.ai_triage.owasp_top10 %}{{ f.ai_triage.owasp_top10 }}{% else %}-{% endif %}</td>
+  <td>{% if fc and fc.pci_dss_4 %}{{ fc.pci_dss_4 | join(', ') }}{% else %}-{% endif %}</td>
   <td>{{ f.source_tool }}</td>
   <td>{{ f.target.value }}</td>
-  <td>{% if f.ai_triage %}{{ f.ai_triage.business_impact or '-' }}{% else %}-{% endif %}</td>
 </tr>
 {% endfor %}
 </tbody>
@@ -85,14 +157,14 @@
 <p><em>Nenhum achado crítico ou alto. Mantenha vigilância — ausência de high não significa ausência de risco.</em></p>
 {% endif %}
 
-<h2>3. Recomendações Prioritárias</h2>
+<h2>4. Recomendações Prioritárias</h2>
 <ol>
 {% for rec in top_recommendations %}
 <li>{{ rec }}</li>
 {% endfor %}
 </ol>
 
-<h2>4. Próximos passos — handoff pra IA patcher</h2>
+<h2>5. Próximos passos — handoff pra IA patcher</h2>
 
 <div class="next-steps-box">
 <p>Pra encadear correção automatizada com Claude Code, Cursor ou outra IA:</p>
@@ -103,7 +175,7 @@ cai bundle {{ scan_id }}</code></pre>
 e instruções de re-verificação por finding.</p>
 </div>
 
-<h2>5. Referências</h2>
+<h2>6. Referências</h2>
 <p>
 Operador: <strong>{{ actor or '(não informado)' }}</strong>.<br>
 Relatório técnico detalhado: <code>{{ technical_report_path }}</code>.
