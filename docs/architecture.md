@@ -166,16 +166,16 @@ class AIRun:
 
 8 routers REST, todos com `X-API-Token`:
 
-| Router           | Endpoints                                                                                                                                            |
-| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `targets.py`     | POST/GET `/targets`                                                                                                                                  |
-| `scans.py`       | POST `/scans` (arq enqueue), GET `/scans/{id}`, GET `/scans`, **DELETE `/scans/{id}`** (204; audita `scan.delete` e apaga findings + AI runs por FK) |
-| `findings.py`    | GET `/findings` (filtros), GET `/findings/{id}`                                                                                                      |
-| `reports.py`     | GET HTML, **GET `/reports/{id}/ai-bundle`** ⭐, POST DefectDojo                                                                                      |
-| `exposure.py`    | POST `/exposure/scan` (OSINT)                                                                                                                        |
-| `investigate.py` | POST `/investigate/{finding_id}` (CAI agentic, HITL)                                                                                                 |
-| `health.py`      | **GET `/health/full`** ⭐ — agregador (Postgres/Redis/ZAP/LLM)                                                                                       |
-| `ui.py`          | **`/ui/api/*`** ⭐ — endpoints do dashboard + SSE                                                                                                    |
+| Router           | Endpoints                                                                                                                                                                                          |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `targets.py`     | POST/GET `/targets`                                                                                                                                                                                |
+| `scans.py`       | POST `/scans` (arq enqueue), GET `/scans/{id}`, GET `/scans`, **DELETE `/scans/{id}`** (204; audita `scan.delete` e apaga findings + AI runs por FK)                                               |
+| `findings.py`    | GET `/findings` (filtros), GET `/findings/{id}`                                                                                                                                                    |
+| `reports.py`     | GET HTML técnico, **GET `/reports/{id}/executive`** (HTML executivo + compliance), **GET `/reports/{id}/compliance`** (JSON OWASP/PCI/LGPD), **GET `/reports/{id}/ai-bundle`** ⭐, POST DefectDojo |
+| `exposure.py`    | POST `/exposure/scan` (OSINT)                                                                                                                                                                      |
+| `investigate.py` | POST `/investigate/{finding_id}` (CAI agentic, HITL)                                                                                                                                               |
+| `health.py`      | **GET `/health/full`** ⭐ — agregador (Postgres/Redis/ZAP/LLM)                                                                                                                                     |
+| `ui.py`          | **`/ui/api/*`** ⭐ — endpoints do dashboard + SSE                                                                                                                                                  |
 
 `/health` (sem auth) — liveness simples.
 
@@ -198,8 +198,9 @@ Servido via `app.mount("/ui", StaticFiles(...))`.
 
 ### Reporting (`orchestrator/reporting/`)
 
-- **`renderer.py`** — Jinja2 templates (`report.html.j2` técnico, `executive.html.j2` resumo)
-- **`exporters/ai_bundle.py`** ⭐ — gera AI Fix Bundle (schema 1.0.0). Usa `uuid5(deduped_key)` pra ID estável. Aplica `scrubber` antes de servir
+- **`compliance.py`** ⭐ — motor de mapeamento **determinístico** (sem I/O): cada `Finding` → OWASP Top 10 2021 (derivado do CWE, ou o `owasp_top10` da triagem de IA quando presente) → PCI DSS 4.0 + LGPD, + flag CWE Top 25 (2023) + CVSS base (real ou banda de severidade). `build_compliance_report()` agrega cobertura por framework + **nota de postura A–F** (nunca melhor que D com crítico aberto) + top risks por CVSS. Testado em `tests/unit/test_compliance.py`
+- **`renderer.py`** — Jinja2 templates (`report.html.j2` técnico, `executive.html.j2` resumo + seção de compliance: badge de nota, tabelas OWASP→PCI→LGPD, CWE Top 25)
+- **`exporters/ai_bundle.py`** ⭐ — gera AI Fix Bundle (schema 1.0.0). Usa `uuid5(deduped_key)` pra ID estável. Aplica `scrubber` antes de servir. Carrega um bloco `compliance` (nota + cobertura de frameworks) junto da classificação por vulnerabilidade
 - **`exporters/defectdojo.py`** — Generic Findings Import
 
 ---
