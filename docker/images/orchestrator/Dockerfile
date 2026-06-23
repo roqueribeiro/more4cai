@@ -55,7 +55,7 @@ RUN uv pip install --system --no-cache-dir \
         arq redis \
         PyGithub shodan \
         python-gvm \
-        authlib "python-jose[cryptography]" "passlib[bcrypt]" \
+        authlib "python-jose[cryptography]" "passlib[bcrypt]" itsdangerous \
         jinja2 pyyaml \
         dnstwist \
         typer rich
