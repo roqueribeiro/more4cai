@@ -6,6 +6,7 @@ Wraps run_scan() e run_exposure_scan() em job assíncrono.
 from __future__ import annotations
 
 from typing import Any
+from uuid import UUID
 
 import structlog
 
@@ -38,7 +39,14 @@ async def run_scan_job(
 
     log.info("scan.started", target=target_value, scanners=scanners, actor=actor)
 
-    result = await run_scan(target, options=options or {})
+    # Pass the requested scan_id so the pipeline UPDATES the scan POST /scans
+    # created (the one the UI is watching) instead of minting a new id — which
+    # left the UI's scan stuck in `pending` forever.
+    result = await run_scan(
+        target,
+        options=options or {},
+        scan_id=UUID(scan_id) if scan_id else None,
+    )
 
     log.info(
         "scan.finished",

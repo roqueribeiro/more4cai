@@ -101,6 +101,7 @@ async def run_scan(
     adapters: list[ScannerAdapter] | None = None,
     skip_ai: bool = False,
     options: dict[str, dict[str, Any]] | None = None,
+    scan_id: UUID | None = None,
 ) -> ScanResult:
     """Pipeline completo da Fase 1.
 
@@ -109,8 +110,9 @@ async def run_scan(
         adapters: lista de adapters; default = [Nmap, ZAP].
         skip_ai: se True, pula AIAnalyzer (útil quando não há API key).
         options: dict por adapter — `{"nmap": {...}, "zap": {...}}`.
+        scan_id: id do scan a ATUALIZAR (criado por POST /scans). None = cria novo.
     """
-    scan_id = uuid4()
+    scan_id = scan_id or uuid4()
     options = options or {}
     if adapters is None:
         adapters = [
@@ -222,12 +224,23 @@ async def _ensure_scan_row(scan_id: UUID, target: Target) -> None:
             else:
                 target_row = existing
 
-            scan_row = ScanRow(
-                id=scan_id,
-                target_id=target_row.id,
-                state=ScanState.RUNNING.value,
-            )
-            s.add(scan_row)
+            # Upsert: POST /scans already created this ScanRow (state=pending) and
+            # the UI is watching that id — so UPDATE it to running instead of
+            # inserting a duplicate (which would collide on the PK and orphan the
+            # UI's scan in `pending` forever). Only create when truly absent.
+            scan_row = await s.get(ScanRow, scan_id)
+            if scan_row is None:
+                scan_row = ScanRow(
+                    id=scan_id,
+                    target_id=target_row.id,
+                    state=ScanState.RUNNING.value,
+                )
+                s.add(scan_row)
+            else:
+                scan_row.state = ScanState.RUNNING.value
+                if not scan_row.target_id:
+                    scan_row.target_id = target_row.id
+                s.add(scan_row)
             await s.commit()
     except Exception as e:  # noqa: BLE001
         log.warning("scan.upfront_persist_failed", scan_id=str(scan_id), error=str(e))
