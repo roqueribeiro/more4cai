@@ -43,7 +43,14 @@ class WorkerSettings:
     max_jobs = 4
     job_timeout = 3600  # scans podem ser longos
     keep_result = 3600 * 24
+    # arq lê `functions` como ATRIBUTO iterável (não chama um método). Atribuído
+    # logo abaixo, após a classe estar definida, pra preservar o late import de
+    # `workers` (evita o ciclo queue<->workers) sem quebrar arq >=0.26 (0.28
+    # falhava: `'classmethod' object is not iterable`).
+    functions: list = []
 
-    @classmethod
-    def functions(cls) -> list:
-        return _functions()
+
+# Bind após a definição da classe + do módulo: o late import de `workers` roda
+# com `queue` já totalmente carregado, então qualquer import indireto de volta
+# pra `queue` encontra todos os nomes resolvidos.
+WorkerSettings.functions = _functions()

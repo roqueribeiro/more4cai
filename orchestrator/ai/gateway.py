@@ -17,11 +17,18 @@ from collections.abc import Sequence
 from typing import Any
 from uuid import UUID
 
+import litellm
 import structlog
 from litellm import acompletion
 from litellm.exceptions import APIConnectionError, APIError, ServiceUnavailableError
 
 from orchestrator.config import settings
+
+# Reasoning models (claude-opus-4-*, OpenAI o-series) reject params like
+# `temperature` ≠ 1. Let litellm silently DROP any param the selected model
+# doesn't support instead of raising UnsupportedParamsError — otherwise AI
+# triage fails for the whole batch (seen live: opus-4-7 + temperature=0.2).
+litellm.drop_params = True
 
 log = structlog.get_logger(__name__)
 
