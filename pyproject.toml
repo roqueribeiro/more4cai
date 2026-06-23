@@ -75,6 +75,8 @@ dependencies = [
     "authlib>=1.7.0",
     "python-jose[cryptography]>=3.3.0",
     "passlib[bcrypt]>=1.7.4",
+    # SessionMiddleware (starlette) assina o cookie de state/nonce do fluxo OIDC.
+    "itsdangerous>=2.1.0",
 
     # relatório
     "jinja2>=3.1.4",

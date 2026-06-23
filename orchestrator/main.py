@@ -17,8 +17,12 @@ import structlog
 from fastapi import FastAPI
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.middleware.sessions import SessionMiddleware
 
 from orchestrator.ai.observability import log_processor
+from orchestrator.api.routers import (
+    auth as auth_router,
+)
 from orchestrator.api.routers import (
     exposure as exposure_router,
 )
@@ -108,6 +112,15 @@ app.include_router(investigate_router.router)
 app.include_router(health_router.router)  # /health/full
 app.include_router(ui_router.router)  # /ui/api/*
 app.include_router(users_router.router)  # /users (admin-only, RBAC)
+app.include_router(auth_router.router)  # /auth (OIDC SSO)
+
+# Session cookie pro state/nonce do fluxo OIDC (authlib usa request.session).
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=settings.SESSION_SECRET or settings.APP_TOKEN,
+    same_site="lax",
+    https_only=False,
+)
 
 # Static files servindo o dashboard em /ui
 _STATIC_DIR = Path(__file__).parent / "static"

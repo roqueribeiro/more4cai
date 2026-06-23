@@ -75,11 +75,17 @@ class Settings(BaseSettings):
     TARGET_ALLOWLIST: str = ""
     REQUIRE_AUTH_REF: bool = False
 
-    # OIDC (Fase 6 stub)
+    # OIDC / SSO (Fase 6). Quando OIDC_ISSUER + CLIENT_ID + CLIENT_SECRET estão
+    # setados, o login via IdP (Entra ID / Keycloak / Okta) é habilitado.
     OIDC_ISSUER: str = ""
     OIDC_CLIENT_ID: str = ""
     OIDC_CLIENT_SECRET: str = ""
     OIDC_REDIRECT_URI: str = ""
+    # Papel atribuído a um usuário recém-provisionado pelo SSO (fail-closed: viewer).
+    OIDC_DEFAULT_ROLE: str = "viewer"
+    # Chave HMAC pra assinar a sessão (JWT HS256). Vazio → cai no APP_TOKEN.
+    SESSION_SECRET: str = ""
+    SESSION_TTL_HOURS: int = 12
 
     # Logging
     LOG_LEVEL: str = "INFO"

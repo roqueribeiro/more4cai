@@ -27,6 +27,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `/users` router (admin-only): create, list, set-role, deactivate,
     rotate-token. 14 new tests (`tests/unit/test_rbac.py`,
     `tests/unit/test_auth_principal.py`); 70 unit tests total.
+- **SSO / OIDC login** (`orchestrator/api/routers/auth.py` + `orchestrator/auth/`).
+  - `GET /auth/login` → IdP redirect; `GET /auth/callback` validates the ID
+    token via authlib (JWKS signature + nonce + aud + exp), find-or-provisions
+    the user (`idp_subject` then `email`; new users get `OIDC_DEFAULT_ROLE`,
+    fail-closed `viewer`), audits `user.login`, and issues a **session JWT**
+    (HS256, `SESSION_TTL_HOURS`). `GET /auth/me` returns the current identity.
+  - `get_principal` now also accepts `Authorization: Bearer <session-jwt>` — it
+    re-fetches the user from the DB so role changes / deactivation revoke
+    immediately. Enabled only when `OIDC_ISSUER`/`CLIENT_ID`/`CLIENT_SECRET`
+    are set (else `/auth/*` → 503).
+  - New settings: `OIDC_DEFAULT_ROLE`, `SESSION_SECRET` (falls back to
+    `APP_TOKEN`), `SESSION_TTL_HOURS`. New deps: `itsdangerous` (session cookie
+    for the OIDC state). 11 new tests (`test_session.py`, `test_provisioning.py`,
+    Bearer cases in `test_auth_principal.py`); 81 unit tests total.
 - `orchestrator.audit.log_audit_event` — append-only audit logging applied to
   `POST /scans` and `POST /targets`. Backed by `audit_log` table reintroduced
   by migration `0004_restore_audit_compliance`. In Postgres, UPDATE/DELETE on

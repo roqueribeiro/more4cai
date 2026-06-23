@@ -18,11 +18,13 @@ import hashlib
 import hmac
 from dataclasses import dataclass
 from typing import Annotated
+from uuid import UUID
 
 from fastapi import Depends, Header, HTTPException, status
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from orchestrator.auth.session import verify_session
 from orchestrator.config import settings
 from orchestrator.domain.roles import Permission, Role, coerce_role, has_permission
 from orchestrator.persistence.db import get_session
@@ -55,37 +57,59 @@ def token_hash(token: str) -> str:
 async def get_principal(
     session: SessionDep,
     x_api_token: Annotated[str | None, Header(alias="X-API-Token")] = None,
+    authorization: Annotated[str | None, Header()] = None,
 ) -> Principal:
-    """Resolve o `Principal` a partir do header `X-API-Token`.
+    """Resolve o `Principal` a partir das credenciais do request.
 
-    Ordem: (1) token de serviço (`APP_TOKEN`, comparação timing-safe, sem DB);
-    (2) token por-usuário (lookup por hash). 401 se nenhum casar.
+    Ordem:
+    1. `X-API-Token` = `APP_TOKEN` → principal de serviço ADMIN (timing-safe, sem DB).
+    2. `X-API-Token` = token por-usuário → lookup por hash.
+    3. `Authorization: Bearer <session-jwt>` (login OIDC/SSO) → valida a sessão e
+       **re-busca o usuário no DB** (papel/ativo correntes — revoga na hora).
+
+    401 se nenhuma credencial válida.
     """
-    if not x_api_token:
+    # 1 + 2) X-API-Token
+    if x_api_token:
+        if hmac.compare_digest(x_api_token, settings.APP_TOKEN):
+            return SERVICE_PRINCIPAL
+        user = (
+            await session.exec(
+                select(UserRow).where(UserRow.api_token_hash == token_hash(x_api_token))
+            )
+        ).first()
+        if user is not None and user.active:
+            return Principal(
+                id=str(user.id),
+                email=user.email,
+                role=coerce_role(user.role),
+                is_service=False,
+            )
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="X-API-Token ausente"
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="X-API-Token inválido"
         )
 
-    # 1) token de serviço — compare_digest evita timing attack; não toca o DB.
-    if hmac.compare_digest(x_api_token, settings.APP_TOKEN):
-        return SERVICE_PRINCIPAL
-
-    # 2) token por-usuário — lookup pelo hash (indexado, único).
-    user = (
-        await session.exec(
-            select(UserRow).where(UserRow.api_token_hash == token_hash(x_api_token))
-        )
-    ).first()
-    if user is not None and user.active:
-        return Principal(
-            id=str(user.id),
-            email=user.email,
-            role=coerce_role(user.role),
-            is_service=False,
+    # 3) sessão OIDC (Bearer JWT)
+    if authorization and authorization.lower().startswith("bearer "):
+        claims = verify_session(authorization[7:].strip())
+        if claims:
+            try:
+                user = await session.get(UserRow, UUID(claims["sub"]))
+            except (ValueError, KeyError):
+                user = None
+            if user is not None and user.active:
+                return Principal(
+                    id=str(user.id),
+                    email=user.email,
+                    role=coerce_role(user.role),
+                    is_service=False,
+                )
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="sessão inválida ou expirada"
         )
 
     raise HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED, detail="X-API-Token inválido"
+        status_code=status.HTTP_401_UNAUTHORIZED, detail="credenciais ausentes"
     )
 
 

@@ -101,3 +101,52 @@ async def test_users_manage_is_admin_only():
     with pytest.raises(HTTPException) as ei:
         await gate(principal=operator)
     assert ei.value.status_code == 403
+
+
+# --- sessão OIDC (Authorization: Bearer <jwt>) ------------------------------
+
+
+async def test_bearer_session_maps_to_user_with_current_role():
+    from uuid import uuid4
+
+    from orchestrator.auth.session import issue_session
+
+    uid = uuid4()
+    # a sessão re-busca o usuário no DB → pega o papel CORRENTE (revoga na hora).
+    user = UserRow(id=uid, email="op@bank.com", role="operator", active=True)
+    jwt_tok = issue_session(user_id=uid, email="op@bank.com", role="operator")
+    session = MagicMock()
+    session.get = AsyncMock(return_value=user)
+    p = await get_principal(
+        session=session, x_api_token=None, authorization=f"Bearer {jwt_tok}"
+    )
+    assert p.email == "op@bank.com"
+    assert p.role is Role.OPERATOR
+    assert p.is_service is False
+
+
+async def test_bearer_inactive_user_is_401():
+    from uuid import uuid4
+
+    from orchestrator.auth.session import issue_session
+
+    uid = uuid4()
+    user = UserRow(id=uid, email="x@bank.com", role="admin", active=False)
+    jwt_tok = issue_session(user_id=uid, email="x@bank.com", role="admin")
+    session = MagicMock()
+    session.get = AsyncMock(return_value=user)
+    with pytest.raises(HTTPException) as ei:
+        await get_principal(
+            session=session, x_api_token=None, authorization=f"Bearer {jwt_tok}"
+        )
+    assert ei.value.status_code == 401
+
+
+async def test_bearer_garbage_is_401():
+    session = MagicMock()
+    session.get = AsyncMock(return_value=None)
+    with pytest.raises(HTTPException) as ei:
+        await get_principal(
+            session=session, x_api_token=None, authorization="Bearer not.a.jwt"
+        )
+    assert ei.value.status_code == 401
