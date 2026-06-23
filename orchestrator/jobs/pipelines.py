@@ -102,6 +102,8 @@ async def run_scan(
     skip_ai: bool = False,
     options: dict[str, dict[str, Any]] | None = None,
     scan_id: UUID | None = None,
+    auth_headers: dict[str, str] | None = None,
+    openapi_url: str | None = None,
 ) -> ScanResult:
     """Pipeline completo da Fase 1.
 
@@ -132,7 +134,16 @@ async def run_scan(
         phase = f"{adapter.name}_running"
         await _update_phase(scan_id, phase)
         emit_phase(sid, phase)
-        adapter_opts = options.get(adapter.name, {})
+        adapter_opts = dict(options.get(adapter.name, {}))
+        # Authenticated scanning: feed the auth context to the HTTP scanners
+        # ONLY (nmap is a port scanner — headers/openapi are meaningless there).
+        # The secret never lands here from the persisted scan row; it arrives
+        # as an ephemeral job arg (see run_scan_job).
+        if adapter.name in ("zap", "nuclei"):
+            if auth_headers:
+                adapter_opts["headers"] = auth_headers
+            if openapi_url:
+                adapter_opts["openapi_url"] = openapi_url
         try:
             findings = await _run_adapter(adapter, target, adapter_opts, scan_id_str=sid)
             for f in findings:

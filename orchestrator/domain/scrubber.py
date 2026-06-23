@@ -51,6 +51,13 @@ _AUTH_HEADER: Final[Pattern[str]] = re.compile(
     re.IGNORECASE,
 )
 
+# Cookie / Set-Cookie — session cookies are the most common auth secret in
+# authenticated scans. Redact the whole value (rest of the header line).
+_COOKIE_HEADER: Final[Pattern[str]] = re.compile(
+    r"((?:set-)?cookie\s*:\s*)[^\r\n]+",
+    re.IGNORECASE,
+)
+
 
 def _luhn_check(num: str) -> bool:
     """Valida cartão pelo algoritmo de Luhn. Reduz falso positivo no PAN."""
@@ -87,6 +94,7 @@ def scrub(text: str) -> str:
 
     out = text
     out = _AUTH_HEADER.sub(lambda m: f"{m.group(1)}<REDACTED_TOKEN>", out)
+    out = _COOKIE_HEADER.sub(lambda m: f"{m.group(1)}<REDACTED_COOKIE>", out)
     out = _JWT.sub("<JWT>", out)
     out = _AWS_KEY.sub("<AWS_KEY>", out)
     out = _PAN.sub(_redact_pan, out)

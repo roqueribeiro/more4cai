@@ -26,8 +26,14 @@ async def run_scan_job(
     options: dict[str, dict[str, Any]] | None = None,
     actor: str | None = None,
     scan_id: str | None = None,
+    auth_headers: dict[str, str] | None = None,
+    openapi_url: str | None = None,
 ) -> dict[str, Any]:
-    """Job arq: roda pipeline de scan completo."""
+    """Job arq: roda pipeline de scan completo.
+
+    `auth_headers`/`openapi_url` chegam SÓ por aqui (arg efêmero do job no Redis,
+    consumido + expira) — nunca da `scans` table, que não guarda o segredo.
+    """
     from orchestrator.jobs.pipelines import run_scan
 
     target = Target(
@@ -46,6 +52,8 @@ async def run_scan_job(
         target,
         options=options or {},
         scan_id=UUID(scan_id) if scan_id else None,
+        auth_headers=auth_headers or None,
+        openapi_url=openapi_url or None,
     )
 
     log.info(

@@ -109,7 +109,10 @@ def test_triage_compact_scrubs_email_in_description() -> None:
 
 def test_triage_compact_scrubs_jwt_in_evidence_snippet() -> None:
     jwt = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjMifQ.AAAA-BBBB_CCCC"
-    f = _make_finding(description="JWT exposto", evidence_snippet=f"Cookie: session={jwt}")
+    # Contexto não-cookie de propósito: um JWT solto vira `<JWT>`. (Um JWT DENTRO
+    # de um Cookie agora é redigido pelo redactor de cookie — mais forte — e é
+    # coberto em test_authenticated_scanning.py::test_scrub_redacts_cookie.)
+    f = _make_finding(description="JWT exposto", evidence_snippet=f"token vazado no corpo: {jwt}")
     out = _finding_to_compact(f)
     snippet = out["evidence_snippets"][0]
     assert jwt not in snippet

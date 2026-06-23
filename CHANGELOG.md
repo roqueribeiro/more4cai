@@ -9,6 +9,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Authenticated scanning** — scan behind login by passing an auth context.
+  - `POST /scans` accepts an `auth: { headers, openapi_url }` block. The
+    `headers` (Cookie / `Authorization: Bearer` / custom) are **secrets** and
+    are handled accordingly: `split_scan_auth()` keeps them **out of the
+    `scans` table** (only a non-secret `authenticated` marker + the public
+    `openapi_url` persist) and they ride to the worker as an **ephemeral arq
+    job arg** (Redis, consumed); `redact_audit_auth()` redacts the header
+    **values** in the audit log (keeps the names); the scrubber gains a
+    `Cookie`/`Set-Cookie` redactor so a session cookie can't leak into
+    findings/evidence/AI prompts.
+  - The ZAP adapter injects the headers into every request via the **replacer**
+    add-on and imports an **OpenAPI/Swagger** spec (`openapi_url`) to enumerate
+    the real API surface — both best-effort (a missing add-on never fails the
+    scan). Wired for ZAP + nuclei (the HTTP scanners); nmap is skipped.
+  - 10 new tests (`tests/unit/test_authenticated_scanning.py`) — the security
+    invariant (secret never persisted), audit redaction, Cookie scrubbing, and
+    the ZAP injection; 105 unit tests total.
 - **Compliance & executive reporting** (`orchestrator/reporting/compliance.py`).
   - Deterministic mapping engine: every `Finding` →
     OWASP Top 10 2021 (CWE-derived, or the AI-triage `owasp_top10` when present)

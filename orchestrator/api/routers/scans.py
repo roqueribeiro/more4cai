@@ -34,11 +34,34 @@ _READ = Depends(require_permission(Permission.SCANS_READ))
 router = APIRouter(prefix="/scans", tags=["scans"])
 
 
+class AuthContext(BaseModel):
+    """Contexto de autenticação pra scanning autenticado (atrás de login).
+
+    Os `headers` (Cookie/Authorization/custom) são SEGREDOS: nunca persistem na
+    tabela `scans` — viajam só como arg efêmero do job (Redis) até o worker, e
+    o scrubber redige seus valores de qualquer evidência/relatório. O
+    `openapi_url` NÃO é segredo (é a spec pública da API) e pode ser persistido.
+    """
+
+    headers: dict[str, str] = Field(
+        default_factory=dict,
+        description="Headers injetados em toda request (ex.: Cookie, Authorization).",
+    )
+    openapi_url: str | None = Field(
+        default=None,
+        description="URL de uma spec OpenAPI/Swagger pra enumerar a superfície da API.",
+    )
+
+
 class ScanIn(BaseModel):
     target_id: UUID
     profile: str = "web"  # web | network | exposure | cloud | full
     scanners: list[str] = Field(default_factory=lambda: ["nmap", "zap"])
     options: dict = Field(default_factory=dict)
+    auth: AuthContext | None = Field(
+        default=None,
+        description="Scanning autenticado — headers efêmeros + OpenAPI (ver AuthContext).",
+    )
     actor: str | None = None
     authorization_ref: str | None = Field(
         default=None,
@@ -59,6 +82,35 @@ class ScanOut(BaseModel):
     finished_at: datetime | None
     report_path: str | None
     errors: list[str]
+
+
+def split_scan_auth(
+    options: dict, auth: AuthContext | None
+) -> tuple[dict, dict[str, str], str | None]:
+    """Separa o que PODE persistir do segredo EFÊMERO (scanning autenticado).
+
+    Retorna `(persisted_options, auth_headers, openapi_url)`:
+    - `persisted_options` = `options` + marcadores não-secretos (`authenticated`,
+      `openapi_url`) — **sem** os valores dos headers. É o que vai pra `scans`.
+    - `auth_headers` / `openapi_url` = segredo efêmero (vai só pro job).
+    """
+    persisted = dict(options or {})
+    headers = dict(auth.headers) if auth and auth.headers else {}
+    openapi = auth.openapi_url if auth else None
+    if headers or openapi:
+        persisted["authenticated"] = True
+    if openapi:
+        persisted["openapi_url"] = openapi  # spec pública, não é segredo
+    return persisted, headers, openapi
+
+
+def redact_audit_auth(audit_body: dict) -> dict:
+    """Redige os VALORES dos auth headers no request_body do audit, mantendo os
+    NOMES (a auditoria precisa saber QUAIS headers, não o segredo)."""
+    auth = audit_body.get("auth")
+    if isinstance(auth, dict) and isinstance(auth.get("headers"), dict):
+        auth["headers"] = {k: "<redacted>" for k in auth["headers"]}
+    return audit_body
 
 
 @router.post("", response_model=ScanOut, status_code=status.HTTP_202_ACCEPTED)
@@ -87,12 +139,18 @@ async def create_scan(
             "Forneca o ticket/aprovacao formal do engagement.",
         )
 
+    # Scanning autenticado: o segredo (auth.headers) NUNCA entra na tabela
+    # `scans`. Helpers PUROS (testáveis) separam o que persiste do segredo
+    # efêmero e redigem o audit.
+    persisted_options, auth_headers, openapi_url = split_scan_auth(body.options, body.auth)
+    audit_body = redact_audit_auth(body.model_dump(mode="json"))
+
     scan = ScanRow(
         target_id=target.id,
         state=ScanState.PENDING.value,
         profile=body.profile,
         requested_scanners=body.scanners,
-        options=body.options,
+        options=persisted_options,
         actor=principal.email,
         authorization_ref=body.authorization_ref,
     )
@@ -107,7 +165,7 @@ async def create_scan(
         resource_type="scan",
         resource_id=scan.id,
         authorization_ref=body.authorization_ref,
-        request_body=body.model_dump(mode="json"),
+        request_body=audit_body,
         metadata={
             "target_value": target.value,
             "target_asset_type": target.asset_type,
@@ -129,9 +187,12 @@ async def create_scan(
         criticality=target.criticality,
         contains_pii=target.contains_pii,
         scanners=body.scanners,
-        options=body.options,
+        options=persisted_options,
         actor=principal.email,
         scan_id=str(scan.id),
+        # Segredo efêmero: vai pro job (Redis, consumido) — NÃO pra `scans`.
+        auth_headers=auth_headers or None,
+        openapi_url=openapi_url,
         _job_id=f"scan-{scan.id}",
     )
 

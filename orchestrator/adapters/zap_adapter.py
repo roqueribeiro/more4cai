@@ -77,6 +77,40 @@ class ZAPAdapter:
         url = self._ensure_url(target.value)
         active = bool(options.get("active", False))
         max_children = options.get("max_children", "10")
+        headers = options.get("headers") or {}
+        openapi_url = options.get("openapi_url")
+
+        # Authenticated scanning: inject the auth headers into EVERY request via
+        # ZAP's replacer so the spider + active scan reach behind-login surfaces.
+        # Best-effort: the value goes only to ZAP (never logged/persisted), and a
+        # missing replacer add-on must NOT fail the scan.
+        for name, value in headers.items():
+            try:
+                await self._get(
+                    "/JSON/replacer/action/addRule/",
+                    description=f"cai-auth-{name}",
+                    enabled="true",
+                    matchType="REQ_HEADER",
+                    matchString=name,
+                    matchRegex="false",
+                    replacement=value,
+                )
+            except Exception as e:  # noqa: BLE001 — degrade gracefully (no add-on)
+                log.warning("zap.replacer_failed", header=name, error=str(e))
+        if headers:
+            # log the header NAMES only — never the secret values.
+            log.info("zap.auth_headers_applied", headers=sorted(headers.keys()))
+
+        # OpenAPI/Swagger import: enumerate the real API surface (not just crawled
+        # links) so the scan tests the documented endpoints.
+        if openapi_url:
+            try:
+                await self._get(
+                    "/JSON/openapi/action/importUrl/", url=openapi_url, hostOverride=url
+                )
+                log.info("zap.openapi_imported", spec=openapi_url)
+            except Exception as e:  # noqa: BLE001
+                log.warning("zap.openapi_import_failed", error=str(e))
 
         # 1. acessa a URL pra registrar no site tree
         await self._get("/JSON/core/action/accessUrl/", url=url, followRedirects="true")
