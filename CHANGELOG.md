@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Scanner selection by asset type (IMAGE / REPO scans now actually run their
+  tools)** — `run_scan` used to hardcode `[nmap, zap]` and the API's `scanners`
+  field was silently dropped, so a `POST /scans` with `asset_type=image`/`repo`
+  ran web scanners (which skip those types) and produced nothing. Now the
+  requested `scanners` (or an asset-type default) build the adapter list:
+  `url/domain→[zap]`, `host/port→[nmap]`, `image→[trivy]`,
+  `repo→[gitleaks, trufflehog, trivy, checkov]`. Trivy defaults its internal
+  scanners to `vuln,secret,misconfig` (CVEs + embedded secrets + Dockerfile/IaC
+  misconfig). Unknown scanner names are skipped with a warning; an empty
+  resolution falls back to `[nmap, zap]`. Tests: `tests/unit/test_scanner_selection.py`.
 - **Finding status tracking + AI-consumable paginated queue** — findings stay
   write-once, but their _remediation status_ now persists across re-scans.
   - New `finding_status` table (migration `0006`) keyed by **`deduped_key`**

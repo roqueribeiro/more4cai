@@ -50,6 +50,7 @@ async def run_scan_job(
     # left the UI's scan stuck in `pending` forever.
     result = await run_scan(
         target,
+        scanners=scanners or None,
         options=options or {},
         scan_id=UUID(scan_id) if scan_id else None,
         auth_headers=auth_headers or None,

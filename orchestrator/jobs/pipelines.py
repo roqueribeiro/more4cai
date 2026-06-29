@@ -21,6 +21,7 @@ from orchestrator.ai.observability import emit_phase
 from orchestrator.config import settings
 from orchestrator.domain.dedup import heuristic_dedup
 from orchestrator.domain.schemas import (
+    AssetType,
     Finding,
     ScanStatus,
     Target,
@@ -28,6 +29,46 @@ from orchestrator.domain.schemas import (
 from orchestrator.reporting.renderer import render_html
 
 log = structlog.get_logger(__name__)
+
+
+# Scanner selection. Before this, run_scan() hardcoded [Nmap, ZAP] and the API's
+# `scanners` field was silently dropped — so IMAGE/REPO scans never ran their real
+# tools (trivy/gitleaks/checkov) and the field was effectively dead. Now the
+# requested scanners (or an asset-type default) build the adapter list.
+# See memory roqueshield-image-repo-scanning.
+_DEFAULT_SCANNERS: dict[AssetType, list[str]] = {
+    AssetType.URL: ["zap"],
+    AssetType.DOMAIN: ["zap"],
+    AssetType.HOST: ["nmap"],
+    AssetType.PORT: ["nmap"],
+    AssetType.IMAGE: ["trivy"],
+    AssetType.REPO: ["gitleaks", "trufflehog", "trivy", "checkov"],
+}
+
+
+def _build_adapters(names: list[str]) -> list[ScannerAdapter]:
+    """Instancia adapters a partir dos nomes pedidos; desconhecidos → warning."""
+    from orchestrator.adapters.checkov_adapter import CheckovAdapter
+    from orchestrator.adapters.gitleaks_adapter import GitleaksAdapter
+    from orchestrator.adapters.trivy_adapter import TrivyAdapter
+    from orchestrator.adapters.trufflehog_adapter import TrufflehogAdapter
+
+    factories: dict[str, Any] = {
+        "nmap": lambda: NmapAdapter(),
+        "zap": lambda: ZAPAdapter(base_url=settings.ZAP_BASE_URL, api_key=settings.ZAP_API_KEY),
+        "trivy": lambda: TrivyAdapter(server_url=settings.TRIVY_SERVER_URL or None),
+        "gitleaks": lambda: GitleaksAdapter(),
+        "trufflehog": lambda: TrufflehogAdapter(),
+        "checkov": lambda: CheckovAdapter(),
+    }
+    out: list[ScannerAdapter] = []
+    for n in names:
+        factory = factories.get(n)
+        if factory is None:
+            log.warning("scanner.unknown", scanner=n)
+            continue
+        out.append(factory())
+    return out
 
 
 @dataclass
@@ -99,6 +140,7 @@ async def run_scan(
     target: Target,
     *,
     adapters: list[ScannerAdapter] | None = None,
+    scanners: list[str] | None = None,
     skip_ai: bool = False,
     options: dict[str, dict[str, Any]] | None = None,
     scan_id: UUID | None = None,
@@ -115,12 +157,17 @@ async def run_scan(
         scan_id: id do scan a ATUALIZAR (criado por POST /scans). None = cria novo.
     """
     scan_id = scan_id or uuid4()
-    options = options or {}
+    options = dict(options or {})
     if adapters is None:
-        adapters = [
-            NmapAdapter(),
-            ZAPAdapter(base_url=settings.ZAP_BASE_URL, api_key=settings.ZAP_API_KEY),
-        ]
+        names = scanners or _DEFAULT_SCANNERS.get(target.asset_type, ["nmap", "zap"])
+        adapters = _build_adapters(names)
+        if not adapters:
+            log.warning("scan.no_adapters_resolved", requested=names, fallback="nmap+zap")
+            adapters = _build_adapters(["nmap", "zap"])
+    # Trivy: default internal scanners to vuln+secret+misconfig (CVEs + embedded
+    # secrets + Dockerfile/IaC misconfig) unless the caller already set it.
+    if any(getattr(a, "name", "") == "trivy" for a in adapters):
+        options.setdefault("trivy", {}).setdefault("scanners", "vuln,secret,misconfig")
 
     result = ScanResult(scan_id=scan_id, target=target)
     sid = str(scan_id)
