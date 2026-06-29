@@ -21,6 +21,21 @@ class ScanState(StrEnum):
     CANCELED = "canceled"
 
 
+class FindingStatus(StrEnum):
+    """Estado de RESOLUÇÃO de um problema (workflow), ortogonal à severity.
+
+    Atrelado ao `deduped_key` (identidade determinística do problema), não a um
+    FindingRow (instância de um scan) — ver `FindingStatusRow`.
+    """
+
+    OPEN = "open"
+    IN_PROGRESS = "in_progress"
+    RESOLVED = "resolved"
+    FALSE_POSITIVE = "false_positive"
+    WONT_FIX = "wont_fix"
+    RISK_ACCEPTED = "risk_accepted"
+
+
 def _utcnow() -> datetime:
     return datetime.now(UTC)
 
@@ -100,6 +115,37 @@ class FindingRow(SQLModel, table=True):
     confidence: str = "firm"
     payload: dict[str, Any] = Field(default_factory=dict, sa_type=JSON)
     discovered_at: datetime = Field(default_factory=_utcnow, sa_type=DateTime(timezone=True))
+
+
+class FindingStatusRow(SQLModel, table=True):
+    """Estado de resolução (triage de workflow) de um problema único.
+
+    Keyed por `deduped_key` (a IDENTIDADE determinística do problema — ver
+    `Finding._build_dedup_key`), NÃO por finding id. Razão: `findings` é
+    write-once e um re-scan cria novos FindingRow com o MESMO `deduped_key`;
+    o estado "resolvido/aceito/falso-positivo" pertence ao PROBLEMA, então
+    precisa sobreviver entre scans. Quem corrige um problema no código-alvo e
+    re-escaneia continua vendo "resolvido" (e se o problema sumir do re-scan,
+    fica confirmado). Toda mudança aqui também gera entrada no `audit_log`
+    (ver `api/routers/findings.py::resolve_finding`).
+
+    `last_*`/`target_value` são um snapshot denormalizado do último finding
+    visto com essa key — dá contexto na listagem/auditoria sem JOIN e mesmo se
+    o FindingRow for podado.
+    """
+
+    __tablename__ = "finding_status"
+
+    deduped_key: str = Field(primary_key=True)
+    status: str = Field(default=FindingStatus.OPEN.value, index=True)
+    note: str | None = None
+    updated_by: str | None = Field(default=None, index=True)
+    updated_at: datetime = Field(default_factory=_utcnow, sa_type=DateTime(timezone=True))
+    resolved_at: datetime | None = Field(default=None, sa_type=DateTime(timezone=True))
+    # snapshot denormalizado do último finding com essa key (contexto sem JOIN)
+    last_severity: str | None = Field(default=None, index=True)
+    last_title: str | None = None
+    target_value: str | None = Field(default=None, index=True)
 
 
 class UserRow(SQLModel, table=True):

@@ -9,6 +9,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Finding status tracking + AI-consumable paginated queue** — findings stay
+  write-once, but their _remediation status_ now persists across re-scans.
+  - New `finding_status` table (migration `0006`) keyed by **`deduped_key`**
+    (not finding id) so a status survives the new rows a re-scan creates for the
+    same problem. Statuses: `open`/`in_progress`/`resolved`/`false_positive`/
+    `wont_fix`/`risk_accepted` (`FindingStatus`).
+  - `GET /findings/queue` — paginated (`offset`/`total`/`has_more`), **compact**
+    (no heavy payload), **deduped by key** (one row per problem),
+    **severity-ordered**, filterable by `status` (default `open`) + `min_severity`
+    - `source_tool`. Built for an AI remediation loop to page through findings
+      without blowing its context window.
+  - `GET /findings/summary` — counts by status × severity.
+  - `POST /findings/resolve` — `{deduped_key, status, note}` upserts the status
+    row and writes an `audit_log` event (`finding.status_change`); requires
+    `scans:run`.
+  - Legacy `GET /findings` + `GET /findings/{id}` preserved, now carrying the
+    effective `status`. 7 unit tests in `tests/unit/test_findings_queue.py`.
 - **Authenticated scanning** — scan behind login by passing an auth context.
   - `POST /scans` accepts an `auth: { headers, openapi_url }` block. The
     `headers` (Cookie / `Authorization: Bearer` / custom) are **secrets** and
